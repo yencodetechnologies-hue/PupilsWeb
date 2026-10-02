@@ -8,6 +8,24 @@ export const fmtDate = (ts) =>
 
 export const safeUrl = (url) => (/^https?:\/\//i.test(url || "") ? url : `https://${url || ""}`);
 
+const ICONS = {
+  overview: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
+  batches: "M5 4h4v16H5zM10 4h4v16h-4zM15.5 4.5l3.8-1 3.9 15.4-3.8 1z",
+  link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2",
+  members: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6",
+  logout: "M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10",
+  chevron: "M9 6l6 6-6 6",
+  close: "M6 6l12 12M18 6L6 18",
+};
+
+export function Icon({ name, size = 20 }) {
+  return (
+    <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={ICONS[name]} />
+    </svg>
+  );
+}
+
 export function Brand() {
   return (
     <div className="brand">
@@ -136,7 +154,8 @@ export function Drawer({ title, onClose, children }) {
     <div className="scrim" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="drawer" role="dialog" aria-modal="true" aria-label={title || "Details"}>
         <div className="drawer-top">
-          <button className="btn ghost sm" onClick={onClose}>Close</button>
+          <span className="grab" aria-hidden="true" />
+          <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
         </div>
         {children}
       </div>

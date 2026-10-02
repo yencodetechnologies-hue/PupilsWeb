@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, downloadCsv } from "../api";
 import { joinUrl } from "../site";
-import { Brand, Drawer, ErrBox, Field, MemberProfile, initials } from "../components";
+import { Brand, Drawer, ErrBox, Field, Icon, MemberProfile, initials } from "../components";
 import { useAuth, useToast } from "../state";
 
 const TABS = [
@@ -30,11 +30,13 @@ export function Dashboard() {
 
   const applyInst = (institution) => updateInstitution(institution);
 
+  const go = (key) => { setTab(key); window.scrollTo(0, 0); };
+  const countFor = (key) => (key === "members" ? members?.length ?? 0 : key === "batches" ? inst.batches.length : null);
+
   const nav = TABS.map(([key, label]) => (
-    <button key={key} className={`nav ${tab === key ? "on" : ""}`} onClick={() => { setTab(key); window.scrollTo(0, 0); }}>
-      {label}
-      {key === "members" && <span className="count">{members?.length ?? 0}</span>}
-      {key === "batches" && <span className="count">{inst.batches.length}</span>}
+    <button key={key} className={`nav ${tab === key ? "on" : ""}`} onClick={() => go(key)}>
+      <span className="nav-l"><Icon name={key} />{label}</span>
+      {countFor(key) !== null && <span className="count">{countFor(key)}</span>}
     </button>
   ));
 
@@ -51,20 +53,38 @@ export function Dashboard() {
         <SignOut />
       </aside>
       <div className="shell">
-        <nav className="mobile-top">{nav}<SignOut /></nav>
+        <header className="mobile-bar">
+          <div className="brand-mark">A</div>
+          <div className="mb-title">
+            <b>{inst.name}</b>
+            <small>{inst.type} · {inst.admin.name}</small>
+          </div>
+          <SignOut compact />
+        </header>
         <main className="main">
           {loadErr && <ErrBox msg={loadErr} />}
-          {tab === "overview" && <Overview inst={inst} members={members} setTab={setTab} onSeeded={(data) => { applyInst(data.institution); setMembers(data.members); }} />}
+          {tab === "overview" && <Overview inst={inst} members={members} setTab={go} onSeeded={(data) => { applyInst(data.institution); setMembers(data.members); }} />}
           {tab === "batches" && <Batches inst={inst} members={members || []} onChange={applyInst} />}
           {tab === "link" && <JoinLink inst={inst} onChange={applyInst} />}
-          {tab === "members" && <Members inst={inst} members={members} setTab={setTab} onSeeded={(data) => { applyInst(data.institution); setMembers(data.members); }} onRemove={(id) => setMembers((list) => list.filter((item) => item.id !== id))} />}
+          {tab === "members" && <Members inst={inst} members={members} setTab={go} onSeeded={(data) => { applyInst(data.institution); setMembers(data.members); }} onRemove={(id) => setMembers((list) => list.filter((item) => item.id !== id))} />}
         </main>
+        <nav className="tabbar" aria-label="Sections">
+          {TABS.map(([key, label]) => (
+            <button key={key} className={tab === key ? "on" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => go(key)}>
+              <span className="tb-icon">
+                <Icon name={key} size={22} />
+                {key === "members" && !!members?.length && <i className="dot">{members.length}</i>}
+              </span>
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
     </div>
   );
 }
 
-function SignOut() {
+function SignOut({ compact }) {
   const { setSession } = useAuth();
   const navigate = useNavigate();
   const logout = async () => {
@@ -72,7 +92,8 @@ function SignOut() {
     setSession(null);
     navigate("/");
   };
-  return <button className="nav" onClick={logout}>Sign out</button>;
+  if (compact) return <button className="icon-btn light" onClick={logout} aria-label="Sign out"><Icon name="logout" /></button>;
+  return <button className="nav" onClick={logout}><span className="nav-l"><Icon name="logout" />Sign out</span></button>;
 }
 
 async function seed(toast, onSeeded) {
@@ -416,7 +437,7 @@ function Members({ inst, members, setTab, onSeeded, onRemove }) {
             </div>
             <div className="person-list only-mobile">
               {group.map((member) => (
-                <article className="person" key={member.id}>
+                <button type="button" className="person" key={member.id} onClick={() => setOpen(member.id)}>
                   <div className="who">
                     <div className="av">{initials(member.name)}</div>
                     <div>
@@ -424,8 +445,8 @@ function Members({ inst, members, setTab, onSeeded, onRemove }) {
                       <small>{member.city || "City not set"} · {member.occupation || member.businesses?.[0]?.name || "Alumni"}</small>
                     </div>
                   </div>
-                  <button className="btn ghost sm" onClick={() => setOpen(member.id)}>View</button>
-                </article>
+                  <Icon name="chevron" size={18} />
+                </button>
               ))}
             </div>
           </section>
