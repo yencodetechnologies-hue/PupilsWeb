@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, downloadCsv } from "../api";
+import { joinUrl } from "../site";
 import { Brand, Drawer, ErrBox, Field, MemberProfile, initials } from "../components";
 import { useAuth, useToast } from "../state";
 
@@ -258,7 +259,7 @@ function Batches({ inst, members, onChange }) {
 function JoinLink({ inst, onChange }) {
   const toast = useToast();
   const navigate = useNavigate();
-  const url = `${window.location.origin}/join/${inst.code}`;
+  const url = joinUrl(inst.code);
   const message = encodeURIComponent(`Hi! Join the ${inst.name} alumni network and reconnect with your batch: ${url}`);
 
   const copy = async () => {

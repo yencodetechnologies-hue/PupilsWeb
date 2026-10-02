@@ -37,6 +37,7 @@ import {
   HttpError,
   TYPES,
   cleanList,
+  clearCookieOpts,
   cookieOpts,
   fmtDate,
   hashOtp,
@@ -54,7 +55,28 @@ import {
   wrap,
 } from "./util.js";
 
+const FRONTEND_ORIGINS = new Set([
+  "https://pupils-web.vercel.app",
+  "https://pupilsweb.in",
+  "https://www.pupilsweb.in",
+  "https://pupilsweb.com",
+  "https://www.pupilsweb.com",
+  "http://localhost:5173",
+]);
+
 const app = express();
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && FRONTEND_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
@@ -170,7 +192,7 @@ app.post("/api/auth/login", wrap(async (req, res) => {
 }));
 
 app.post("/api/auth/logout", (_req, res) => {
-  res.clearCookie("ac_token", { path: "/" });
+  res.clearCookie("ac_token", clearCookieOpts);
   res.json({ ok: true });
 });
 

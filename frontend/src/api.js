@@ -1,7 +1,9 @@
+import { apiUrl } from "./site";
+
 export async function api(path, { method = "GET", body } = {}) {
   let res;
   try {
-    res = await fetch(path, {
+    res = await fetch(apiUrl(path), {
       method,
       credentials: "include",
       headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -16,7 +18,7 @@ export async function api(path, { method = "GET", body } = {}) {
 }
 
 export async function downloadCsv() {
-  const res = await fetch("/api/members/export.csv", { credentials: "include" });
+  const res = await fetch(apiUrl("/api/members/export.csv"), { credentials: "include" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || "Could not export the alumni list.");
