@@ -54,7 +54,7 @@ export function Dashboard() {
       </aside>
       <div className="shell">
         <header className="mobile-bar">
-          <div className="brand-mark">A</div>
+          <div className="brand-mark">P</div>
           <div className="mb-title">
             <b>{inst.name}</b>
             <small>{inst.type} · {inst.admin.name}</small>

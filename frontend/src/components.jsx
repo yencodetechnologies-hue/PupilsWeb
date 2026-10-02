@@ -29,8 +29,8 @@ export function Icon({ name, size = 20 }) {
 export function Brand() {
   return (
     <div className="brand">
-      <div className="brand-mark">A</div>
-      Alumni Connect
+      <div className="brand-mark">P</div>
+      PupilsWeb
     </div>
   );
 }
@@ -299,7 +299,7 @@ export function MemberProfile({ member }) {
 export function Loading({ label = "Opening your yearbook…" }) {
   return (
     <div className="loading">
-      <div className="brand-mark">A</div>
+      <div className="brand-mark">P</div>
       <p>{label}</p>
     </div>
   );
