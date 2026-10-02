@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api";
-import { Brand, ErrBox, Field, MemberProfile, initials } from "../components";
+import { api, uploadPhoto } from "../api";
+import { Avatar, Brand, ErrBox, Field, MemberProfile, PhotoPicker } from "../components";
 import { useAuth, useToast } from "../state";
 
 export function MemberHome() {
@@ -51,7 +51,7 @@ export function MemberHome() {
             <div className="mate-grid">
               {mates.map((mate) => (
                 <article className="mate" key={mate.id}>
-                  <div className="av">{initials(mate.name)}</div>
+                  <Avatar name={mate.name} photo={mate.photo} />
                   <b>{mate.name}</b>
                   <small>{[mate.city, mate.occupation || mate.qualification].filter(Boolean).join(" · ") || "Batchmate"}</small>
                 </article>
@@ -72,6 +72,8 @@ function EditProfile({ member, onSaved }) {
   const [city, setCity] = useState(member.city || "");
   const [occupation, setOccupation] = useState(member.occupation || "");
   const [links, setLinks] = useState(member.links?.length ? member.links : [{ label: "", url: "" }]);
+  const [photo, setPhoto] = useState(member.photo || "");
+  const [photoFile, setPhotoFile] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -80,10 +82,16 @@ function EditProfile({ member, onSaved }) {
     setBusy(true);
     setErr("");
     try {
-      const data = await api("/api/me", {
-        method: "PATCH",
-        body: { mobile, city, occupation, links },
-      });
+      const body = { mobile, city, occupation, links };
+      if (photoFile) {
+        const uploaded = await uploadPhoto(photoFile);
+        body.photo = uploaded.photo;
+        body.photoId = uploaded.photoId;
+      } else if (!photo && member.photo) {
+        body.photo = "";
+        body.photoId = "";
+      }
+      const data = await api("/api/me", { method: "PATCH", body });
       onSaved(data.member);
     } catch (error) {
       setErr(error.message);
@@ -96,6 +104,22 @@ function EditProfile({ member, onSaved }) {
     <form onSubmit={save} noValidate>
       <ErrBox msg={err} />
       <p className="sub">Update how batchmates can reach you. Email stays {member.email}.</p>
+      <PhotoPicker
+        name={member.name}
+        photo={photo}
+        file={photoFile}
+        onFile={(file, message) => {
+          if (message) setErr(message);
+          else {
+            setErr("");
+            setPhotoFile(file);
+          }
+        }}
+        onClear={() => {
+          setPhotoFile(null);
+          setPhoto("");
+        }}
+      />
       <div className="row">
         <Field label="Mobile number"><input inputMode="tel" value={mobile} onChange={(event) => setMobile(event.target.value)} /></Field>
         <Field label="City"><input value={city} onChange={(event) => setCity(event.target.value)} /></Field>

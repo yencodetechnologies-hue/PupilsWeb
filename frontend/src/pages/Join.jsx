@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api } from "../api";
-import { Brand, ErrBox, Field, Loading, PasswordField } from "../components";
+import { api, uploadPhoto } from "../api";
+import { Brand, ErrBox, Field, Loading, PasswordField, PhotoPicker } from "../components";
 import { useAuth } from "../state";
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -76,6 +76,7 @@ function JoinWizard({ inst, preview, onDone }) {
   const [colleges, setColleges] = useState(null);
   const [businesses, setBusinesses] = useState(null);
   const [links, setLinks] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
   const next = () => {
@@ -112,6 +113,10 @@ function JoinWizard({ inst, preview, onDone }) {
     setBusy(true);
     setErr("");
     try {
+      let picture = {};
+      if (photoFile) {
+        picture = await uploadPhoto(photoFile);
+      }
       const data = await api(`/api/join/${inst.code}`, {
         method: "POST",
         body: {
@@ -120,6 +125,7 @@ function JoinWizard({ inst, preview, onDone }) {
           colleges: colleges || [],
           businesses: businesses || [],
           links: links || [],
+          ...picture,
         },
       });
       setJoined(data.member);
@@ -174,6 +180,18 @@ function JoinWizard({ inst, preview, onDone }) {
           <section>
             <h2>Your account</h2>
             <p className="sub">Pick the year you passed out. You'll sign in with these details.</p>
+            <PhotoPicker
+              name={form.name}
+              file={photoFile}
+              onFile={(file, message) => {
+                if (message) setErr(message);
+                else {
+                  setErr("");
+                  setPhotoFile(file);
+                }
+              }}
+              onClear={() => setPhotoFile(null)}
+            />
             {!inst.batches.length && <ErrBox msg="This institution has no batches yet. Ask the admin to add one." />}
             <Field label="Batch">
               <select value={form.batch} onChange={set("batch")}>

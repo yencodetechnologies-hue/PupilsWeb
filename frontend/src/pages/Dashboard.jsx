@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, downloadCsv } from "../api";
 import { joinUrl } from "../site";
-import { Brand, Drawer, ErrBox, Field, Icon, MemberProfile, initials } from "../components";
+import { Avatar, Brand, Drawer, ErrBox, Field, Icon, MemberProfile } from "../components";
 import { useAuth, useToast } from "../state";
 
 const TABS = [
@@ -166,7 +166,7 @@ function Overview({ inst, members, setTab, onSeeded }) {
             <ul className="recent">
               {recent.map((member) => (
                 <li key={member.id}>
-                  <div className="av">{initials(member.name)}</div>
+                  <Avatar name={member.name} photo={member.photo} />
                   <div>
                     <b>{member.name}</b>
                     <small>Batch {member.batch} · {member.city || member.occupation || "Alumni"}</small>
@@ -421,7 +421,7 @@ function Members({ inst, members, setTab, onSeeded, onRemove }) {
                     <tr key={member.id}>
                       <td>
                         <div className="who">
-                          <div className="av">{initials(member.name)}</div>
+                          <Avatar name={member.name} photo={member.photo} />
                           <div><b>{member.name}</b><small>{member.qualification}</small></div>
                         </div>
                       </td>
@@ -439,7 +439,7 @@ function Members({ inst, members, setTab, onSeeded, onRemove }) {
               {group.map((member) => (
                 <button type="button" className="person" key={member.id} onClick={() => setOpen(member.id)}>
                   <div className="who">
-                    <div className="av">{initials(member.name)}</div>
+                    <Avatar name={member.name} photo={member.photo} />
                     <div>
                       <b>{member.name}</b>
                       <small>{member.city || "City not set"} · {member.occupation || member.businesses?.[0]?.name || "Alumni"}</small>

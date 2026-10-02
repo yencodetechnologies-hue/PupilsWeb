@@ -74,6 +74,7 @@ export function publicMember(row) {
     colleges: Array.isArray(row.colleges) ? row.colleges : [],
     businesses: Array.isArray(row.businesses) ? row.businesses : [],
     links: Array.isArray(row.links) ? row.links : [],
+    photo: row.photo || "",
     joinedAt: Number(row.joinedAt),
   };
 }
@@ -154,6 +155,8 @@ export async function insertMember(row) {
     colleges: row.colleges || [],
     businesses: row.businesses || [],
     links: row.links || [],
+    photo: row.photo || "",
+    photoId: row.photoId || "",
     joinedAt: row.joinedAt,
   });
 }
@@ -181,10 +184,17 @@ export async function savePassword(kind, id, passwordHash) {
 }
 
 export async function updateMemberProfile(id, fields) {
-  await members().updateOne(
-    { id },
-    { $set: { mobile: fields.mobile, city: fields.city, occupation: fields.occupation, links: fields.links } }
-  );
+  const $set = {
+    mobile: fields.mobile,
+    city: fields.city,
+    occupation: fields.occupation,
+    links: fields.links,
+  };
+  if (Object.prototype.hasOwnProperty.call(fields, "photo")) {
+    $set.photo = fields.photo || "";
+    $set.photoId = fields.photoId || "";
+  }
+  await members().updateOne({ id }, { $set });
 }
 
 export async function countInBatch(instId, year) {
@@ -220,7 +230,7 @@ export async function batchmates(instId, batch, exceptId) {
   return members()
     .find(
       { instId, batch, id: { $ne: exceptId } },
-      { projection: { _id: 0, id: 1, name: 1, city: 1, occupation: 1, qualification: 1 } }
+      { projection: { _id: 0, id: 1, name: 1, city: 1, occupation: 1, qualification: 1, photo: 1 } }
     )
     .sort({ name: 1 })
     .toArray();

@@ -2,6 +2,8 @@ import "./env.js";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
 import express from "express";
+import multer from "multer";
+import { acceptPhoto, removePhoto, uploadProfilePhoto } from "./media.js";
 import {
   countInBatch,
   deleteMember,
@@ -79,6 +81,26 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
+
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+  fileFilter(_req, file, cb) {
+    if (["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) cb(null, true);
+    else cb(new HttpError(400, "Use a JPG, PNG, or WebP image."));
+  },
+});
+
+app.post("/api/media/photo", (req, res, next) => {
+  photoUpload.single("photo")(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === "LIMIT_FILE_SIZE") return next(new HttpError(400, "Image must be 2 MB or smaller."));
+    return next(error);
+  });
+}, wrap(async (req, res) => {
+  if (!req.file) throw new HttpError(400, "Choose a profile picture.");
+  res.json(await uploadProfilePhoto(req.file.buffer));
+}));
 
 function sessionOf(req) {
   const token = req.cookies?.ac_token;
@@ -301,8 +323,11 @@ app.get("/api/members", admin, wrap(async (req, res) => {
 }));
 
 app.delete("/api/members/:id", admin, wrap(async (req, res) => {
+  const row = await getMemberById(req.params.id);
+  if (!row || row.instId !== req.inst.id) return res.status(404).json({ error: "That alumni record was not found." });
   const changes = await deleteMember(req.params.id, req.inst.id);
   if (!changes) return res.status(404).json({ error: "That alumni record was not found." });
+  await removePhoto(row.photoId);
   res.json({ ok: true });
 }));
 
@@ -381,6 +406,7 @@ app.post("/api/join/:code", wrap(async (req, res) => {
   const qualification = text(body.qualification, 120);
   const gender = GENDERS.includes(body.gender) ? body.gender : "";
   const blood = BLOOD.includes(body.blood) ? body.blood : "";
+  const picture = body.photo || body.photoId ? acceptPhoto(body.photo, body.photoId) : { photo: "", photoId: "" };
 
   if (!pub.batches.includes(batch)) throw new HttpError(400, "Select your batch.");
   if (!name) throw new HttpError(400, "Enter your full name.");
@@ -414,6 +440,8 @@ app.post("/api/join/:code", wrap(async (req, res) => {
     colleges: cleanList(body.colleges, ["name", "degree", "from", "to"]),
     businesses: cleanList(body.businesses, ["name", "industry", "role", "city", "phone", "web", "desc"]),
     links: cleanList(body.links, ["label", "url"]),
+    photo: picture.photo,
+    photoId: picture.photoId,
     joinedAt: Date.now(),
   };
   await insertMember(row);
@@ -434,13 +462,25 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
   const links = cleanList(req.body?.links, ["label", "url"]);
   if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
   if (await mobileTaken(mobile, req.member.id)) throw new HttpError(400, "This mobile number is already registered.");
-  await updateMemberProfile(req.member.id, { mobile, city, occupation, links });
+  const fields = { mobile, city, occupation, links };
+  let replacedId = "";
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, "photo")) {
+    const picture = acceptPhoto(req.body.photo, req.body.photoId);
+    fields.photo = picture.photo;
+    fields.photoId = picture.photoId;
+    if (req.member.photoId && req.member.photoId !== picture.photoId) replacedId = req.member.photoId;
+  }
+  await updateMemberProfile(req.member.id, fields);
+  if (replacedId) await removePhoto(replacedId);
   res.json({ member: publicMember(await getMemberById(req.member.id)) });
 }));
 
 app.use((err, _req, res, _next) => {
   if (err?.type === "entity.parse.failed") {
     return res.status(400).json({ error: "Invalid request." });
+  }
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ error: "Image must be 2 MB or smaller." });
   }
   const status = err.status || 500;
   if (status >= 500) console.error(err);

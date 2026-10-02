@@ -17,6 +17,20 @@ export async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
+export async function uploadPhoto(file) {
+  const body = new FormData();
+  body.append("photo", file);
+  let res;
+  try {
+    res = await fetch(apiUrl("/api/media/photo"), { method: "POST", credentials: "include", body });
+  } catch {
+    throw new Error("Could not reach the server. Start it and try again.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not upload the profile picture.");
+  return data;
+}
+
 export async function downloadCsv() {
   const res = await fetch(apiUrl("/api/members/export.csv"), { credentials: "include" });
   if (!res.ok) {

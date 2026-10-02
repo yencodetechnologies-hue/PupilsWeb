@@ -40,6 +40,56 @@ export function ErrBox({ msg }) {
   return <div className="err" role="alert">{msg}</div>;
 }
 
+export function Avatar({ name, photo, large }) {
+  const className = large ? "av lg" : "av";
+  if (photo) return <img className={className} src={photo} alt="" />;
+  return <div className={className}>{initials(name)}</div>;
+}
+
+export function PhotoPicker({ name, photo, file, onFile, onClear }) {
+  const inputId = useId();
+  const [preview, setPreview] = useState("");
+  const shown = file ? preview : (photo || "");
+
+  useEffect(() => {
+    if (!file) return undefined;
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const choose = (event) => {
+    const next = event.target.files?.[0];
+    event.target.value = "";
+    if (!next) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(next.type)) {
+      onFile(null, "Use a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (next.size > 2 * 1024 * 1024) {
+      onFile(null, "Image must be 2 MB or smaller.");
+      return;
+    }
+    onFile(next, "");
+  };
+
+  const clear = () => onClear?.();
+
+  return (
+    <div className="photo-pick">
+      <Avatar name={name} photo={shown} large />
+      <div>
+        <div className="photo-actions">
+          <label className="btn ghost sm" htmlFor={inputId}>{shown ? "Change picture" : "Upload profile picture"}</label>
+          {shown && onClear && <button type="button" className="btn ghost sm" onClick={clear}>Remove</button>}
+        </div>
+        <input id={inputId} className="file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={choose} />
+        <p className="sub">JPG, PNG, or WebP, up to 2 MB.</p>
+      </div>
+    </div>
+  );
+}
+
 export function Field({ label, children, hint }) {
   return (
     <label className="field">
@@ -182,7 +232,7 @@ export function MemberProfile({ member }) {
   return (
     <>
       <div className="d-top">
-        <div className="av lg">{initials(member.name)}</div>
+        <Avatar name={member.name} photo={member.photo} large />
         <div>
           <h2>{member.name}</h2>
           <span className="tag">Batch {member.batch}</span>
