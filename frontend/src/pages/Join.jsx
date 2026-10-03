@@ -113,10 +113,8 @@ function JoinWizard({ inst, preview, onDone }) {
     setBusy(true);
     setErr("");
     try {
-      let picture = {};
-      if (photoFile) {
-        picture = await uploadPhoto(photoFile);
-      }
+      let picture = { photo: "", photoId: "" };
+      if (photoFile) picture = await uploadPhoto(photoFile);
       const data = await api(`/api/join/${inst.code}`, {
         method: "POST",
         body: {
@@ -125,7 +123,8 @@ function JoinWizard({ inst, preview, onDone }) {
           colleges: colleges || [],
           businesses: businesses || [],
           links: links || [],
-          ...picture,
+          photo: picture.photo || "",
+          photoId: picture.photoId || "",
         },
       });
       setJoined(data.member);

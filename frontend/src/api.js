@@ -17,9 +17,10 @@ export async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
-export async function uploadPhoto(file) {
+export async function uploadPhoto(file, { save = false } = {}) {
   const body = new FormData();
   body.append("photo", file);
+  if (save) body.append("save", "1");
   let res;
   try {
     res = await fetch(apiUrl("/api/media/photo"), { method: "POST", credentials: "include", body });

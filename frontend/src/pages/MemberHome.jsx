@@ -68,6 +68,7 @@ export function MemberHome() {
 }
 
 function EditProfile({ member, onSaved }) {
+  const { updateMember } = useAuth();
   const [mobile, setMobile] = useState(member.mobile || "");
   const [city, setCity] = useState(member.city || "");
   const [occupation, setOccupation] = useState(member.occupation || "");
@@ -77,22 +78,47 @@ function EditProfile({ member, onSaved }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const storePhoto = async (file) => {
+    setBusy(true);
+    setErr("");
+    try {
+      const uploaded = await uploadPhoto(file, { save: true });
+      setPhoto(uploaded.photo || "");
+      setPhotoFile(null);
+      if (uploaded.member) updateMember(uploaded.member);
+    } catch (error) {
+      setPhotoFile(null);
+      setErr(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearPhoto = async () => {
+    setPhotoFile(null);
+    setPhoto("");
+    setBusy(true);
+    setErr("");
+    try {
+      const data = await api("/api/me", {
+        method: "PATCH",
+        body: { mobile, city, occupation, links, photo: "", photoId: "" },
+      });
+      updateMember(data.member);
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async (event) => {
     event.preventDefault();
     setBusy(true);
     setErr("");
     try {
-      const body = { mobile, city, occupation, links };
-      if (photoFile) {
-        const uploaded = await uploadPhoto(photoFile);
-        body.photo = uploaded.photo;
-        body.photoId = uploaded.photoId;
-      } else if (!photo && member.photo) {
-        body.photo = "";
-        body.photoId = "";
-      }
-      const data = await api("/api/me", { method: "PATCH", body });
-      onSaved(data.member);
+      const data = await api("/api/me", { method: "PATCH", body: { mobile, city, occupation, links } });
+      onSaved({ ...data.member, photo: data.member.photo || photo });
     } catch (error) {
       setErr(error.message);
     } finally {
@@ -109,16 +135,15 @@ function EditProfile({ member, onSaved }) {
         photo={photo}
         file={photoFile}
         onFile={(file, message) => {
-          if (message) setErr(message);
-          else {
-            setErr("");
-            setPhotoFile(file);
+          if (message) {
+            setErr(message);
+            return;
           }
+          setErr("");
+          setPhotoFile(file);
+          storePhoto(file);
         }}
-        onClear={() => {
-          setPhotoFile(null);
-          setPhoto("");
-        }}
+        onClear={clearPhoto}
       />
       <div className="row">
         <Field label="Mobile number"><input inputMode="tel" value={mobile} onChange={(event) => setMobile(event.target.value)} /></Field>

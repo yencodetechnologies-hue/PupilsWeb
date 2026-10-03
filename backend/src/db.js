@@ -197,6 +197,10 @@ export async function updateMemberProfile(id, fields) {
   await members().updateOne({ id }, { $set });
 }
 
+export async function saveMemberPhoto(id, photo, photoId) {
+  await members().updateOne({ id }, { $set: { photo: photo || "", photoId: photoId || "" } });
+}
+
 export async function countInBatch(instId, year) {
   return members().countDocuments({ instId, batch: year });
 }

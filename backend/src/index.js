@@ -19,6 +19,7 @@ import {
   mobileTaken,
   publicInst,
   publicMember,
+  saveMemberPhoto,
   saveBatches,
   saveCode,
   saveInstitutionProfile,
@@ -99,7 +100,17 @@ app.post("/api/media/photo", (req, res, next) => {
   });
 }, wrap(async (req, res) => {
   if (!req.file) throw new HttpError(400, "Choose a profile picture.");
-  res.json(await uploadProfilePhoto(req.file.buffer));
+  const uploaded = await uploadProfilePhoto(req.file.buffer);
+  const session = sessionOf(req);
+  if (req.body?.save === "1" && session?.kind === "member") {
+    const member = await getMemberById(session.id);
+    if (member) {
+      await saveMemberPhoto(member.id, uploaded.photo, uploaded.photoId);
+      if (member.photoId && member.photoId !== uploaded.photoId) await removePhoto(member.photoId);
+      return res.json({ ...uploaded, member: publicMember(await getMemberById(member.id)) });
+    }
+  }
+  res.json(uploaded);
 }));
 
 function sessionOf(req) {
@@ -334,7 +345,7 @@ app.delete("/api/members/:id", admin, wrap(async (req, res) => {
 app.get("/api/members/export.csv", admin, wrap(async (req, res) => {
   const inst = publicInst(req.inst);
   const members = (await membersFor(req.inst.id)).sort((a, b) => a.batch - b.batch || a.name.localeCompare(b.name));
-  const cols = ["batch", "name", "email", "mobile", "dob", "gender", "blood", "father", "mother", "curAddr", "city", "nativeAddr", "qualification", "occupation"];
+  const cols = ["batch", "name", "email", "mobile", "photo", "dob", "gender", "blood", "father", "mother", "curAddr", "city", "nativeAddr", "qualification", "occupation"];
   const q = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
   const lines = [
     [...cols, "schools", "colleges", "businesses", "links", "joined"].join(","),
