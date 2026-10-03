@@ -22,6 +22,7 @@ import {
   saveMemberPhoto,
   saveBatches,
   saveCode,
+  saveAdminAccount,
   saveInstitutionProfile,
   savePassword,
   updateMemberProfile,
@@ -33,7 +34,6 @@ import {
   batchmates,
 } from "./db.js";
 import { sendOtp } from "./mail.js";
-import { SAMPLE_PASSWORD, sampleMembers } from "./sample.js";
 import {
   BLOOD,
   GENDERS,
@@ -301,6 +301,37 @@ app.patch("/api/institution", admin, wrap(async (req, res) => {
   res.json({ institution: publicInst(await getInstById(req.inst.id)) });
 }));
 
+app.patch("/api/account", admin, wrap(async (req, res) => {
+  const name = text(req.body?.name, 80);
+  const instName = text(req.body?.inst, 120);
+  const email = text(req.body?.email, 160).toLowerCase();
+  const mobile = normMobile(req.body?.mobile);
+  const type = TYPES.includes(req.body?.type) ? req.body.type : req.inst.type;
+  if (!name) throw new HttpError(400, "Enter your name.");
+  if (!instName) throw new HttpError(400, "Enter the institution name.");
+  if (!isEmail(email)) throw new HttpError(400, "Enter a valid email ID.");
+  if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
+  if (await emailTaken(email, req.inst.id, "admin")) throw new HttpError(400, "This email is already registered.");
+  if (await mobileTaken(mobile, req.inst.id, "admin")) throw new HttpError(400, "This mobile number is already registered.");
+
+  const fields = {
+    adminName: name,
+    adminEmail: email,
+    adminMobile: mobile,
+    name: instName,
+    type,
+  };
+  const nextPassword = String(req.body?.pw ?? "");
+  if (nextPassword) {
+    const current = String(req.body?.currentPw ?? "");
+    const ok = await bcrypt.compare(current, req.inst.passwordHash);
+    if (!ok) throw new HttpError(400, "Current password is incorrect.");
+    fields.passwordHash = await bcrypt.hash(assertPassword(nextPassword), 10);
+  }
+  await saveAdminAccount(req.inst.id, fields);
+  res.json({ institution: publicInst(await getInstById(req.inst.id)) });
+}));
+
 app.post("/api/batches", admin, wrap(async (req, res) => {
   const current = publicInst(req.inst).batches;
   const incoming = yearsFromBody(req.body || {});
@@ -362,34 +393,6 @@ app.get("/api/members/export.csv", admin, wrap(async (req, res) => {
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(`\uFEFF${lines.join("\n")}`);
-}));
-
-app.post("/api/seed", admin, wrap(async (req, res) => {
-  let inst = publicInst(req.inst);
-  let batches = inst.batches;
-  if (!batches.length) {
-    batches = [2001, 2003, 2004];
-    await saveBatches(req.inst.id, batches);
-    inst = publicInst(await getInstById(req.inst.id));
-  }
-  const passwordHash = await bcrypt.hash(SAMPLE_PASSWORD, 8);
-  let added = 0;
-  for (const person of sampleMembers(inst, batches)) {
-    if (await emailTaken(person.email) || await mobileTaken(person.mobile)) continue;
-    await insertMember({
-      ...person,
-      id: makeId(),
-      instId: req.inst.id,
-      email: person.email.toLowerCase(),
-      passwordHash,
-    });
-    added += 1;
-  }
-  res.json({
-    institution: publicInst(await getInstById(req.inst.id)),
-    members: await membersFor(req.inst.id),
-    added,
-  });
 }));
 
 app.get("/api/join/:code", wrap(async (req, res) => {
@@ -467,23 +470,78 @@ app.get("/api/me/batchmates", memberOnly, wrap(async (req, res) => {
 }));
 
 app.patch("/api/me", memberOnly, wrap(async (req, res) => {
-  const mobile = normMobile(req.body?.mobile);
-  const city = text(req.body?.city, 80);
-  const occupation = text(req.body?.occupation, 120);
-  const links = cleanList(req.body?.links, ["label", "url"]);
-  if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
-  if (await mobileTaken(mobile, req.member.id)) throw new HttpError(400, "This mobile number is already registered.");
-  const fields = { mobile, city, occupation, links };
+  const body = req.body || {};
+  const fields = {};
+  const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
+
+  if (has("name")) {
+    const name = text(body.name, 80);
+    if (!name) throw new HttpError(400, "Enter your full name.");
+    fields.name = name;
+  }
+  if (has("email")) {
+    const email = text(body.email, 160).toLowerCase();
+    if (!isEmail(email)) throw new HttpError(400, "Enter a valid email ID.");
+    if (await emailTaken(email, req.member.id)) throw new HttpError(400, "This email is already registered.");
+    fields.email = email;
+  }
+  if (has("mobile")) {
+    const mobile = normMobile(body.mobile);
+    if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
+    if (await mobileTaken(mobile, req.member.id)) throw new HttpError(400, "This mobile number is already registered.");
+    fields.mobile = mobile;
+  }
+  if (has("batch")) {
+    const inst = await getInstById(req.member.instId);
+    const batch = Number(body.batch);
+    const years = publicInst(inst)?.batches || [];
+    if (!years.includes(batch)) throw new HttpError(400, "Select your batch.");
+    fields.batch = batch;
+  }
+  if (has("father")) fields.father = text(body.father, 80);
+  if (has("mother")) fields.mother = text(body.mother, 80);
+  if (has("city")) fields.city = text(body.city, 80);
+  if (has("qualification")) fields.qualification = text(body.qualification, 120);
+  if (has("occupation")) fields.occupation = text(body.occupation, 120);
+  if (has("dob")) fields.dob = text(body.dob, 20);
+  if (has("gender")) fields.gender = GENDERS.includes(body.gender) ? body.gender : "";
+  if (has("blood")) fields.blood = BLOOD.includes(body.blood) ? body.blood : "";
+  if (has("curAddr")) fields.curAddr = text(body.curAddr, 400);
+  if (has("nativeAddr")) fields.nativeAddr = text(body.nativeAddr, 400);
+  if (has("schools")) fields.schools = cleanList(body.schools, ["name", "board", "from", "to"]);
+  if (has("colleges")) fields.colleges = cleanList(body.colleges, ["name", "degree", "from", "to"]);
+  if (has("businesses")) fields.businesses = cleanList(body.businesses, ["name", "industry", "role", "city", "phone", "web", "desc"]);
+  if (has("links")) fields.links = cleanList(body.links, ["label", "url"]);
+
   let replacedId = "";
-  if (Object.prototype.hasOwnProperty.call(req.body || {}, "photo")) {
-    const picture = acceptPhoto(req.body.photo, req.body.photoId);
+  if (has("photo")) {
+    const picture = acceptPhoto(body.photo, body.photoId);
     fields.photo = picture.photo;
     fields.photoId = picture.photoId;
     if (req.member.photoId && req.member.photoId !== picture.photoId) replacedId = req.member.photoId;
   }
+
+  const nextPassword = String(body.pw ?? "");
+  let nextHash = "";
+  if (nextPassword) {
+    const current = String(body.currentPw ?? "");
+    const ok = await bcrypt.compare(current, req.member.passwordHash);
+    if (!ok) throw new HttpError(400, "Current password is incorrect.");
+    nextHash = await bcrypt.hash(assertPassword(nextPassword), 10);
+  }
+
   await updateMemberProfile(req.member.id, fields);
+  if (nextHash) await savePassword("member", req.member.id, nextHash);
   if (replacedId) await removePhoto(replacedId);
   res.json({ member: publicMember(await getMemberById(req.member.id)) });
+}));
+
+app.delete("/api/me", memberOnly, wrap(async (req, res) => {
+  const changes = await deleteMember(req.member.id, req.member.instId);
+  if (!changes) throw new HttpError(404, "That account was not found.");
+  await removePhoto(req.member.photoId);
+  res.clearCookie("ac_token", clearCookieOpts);
+  res.json({ ok: true });
 }));
 
 app.use((err, _req, res, _next) => {

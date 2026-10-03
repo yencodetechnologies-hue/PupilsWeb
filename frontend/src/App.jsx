@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Loading } from "./components";
+import { LanguageProvider } from "./i18n";
 import { Forgot, Login, Register } from "./pages/AuthPages";
 import { Dashboard } from "./pages/Dashboard";
 import { Join } from "./pages/Join";
@@ -31,9 +32,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <div className="ac">
-      <Providers>
-        <AppRoutes />
-      </Providers>
+      <LanguageProvider>
+        <Providers>
+          <AppRoutes />
+        </Providers>
+      </LanguageProvider>
     </div>
   );
 }

@@ -103,17 +103,17 @@ export async function findByMobile(mobile) {
   return null;
 }
 
-export async function emailTaken(email, exceptMemberId) {
+export async function emailTaken(email, exceptId, exceptKind = "member") {
   const found = await findByEmail(email);
   if (!found) return false;
-  if (exceptMemberId && found.kind === "member" && found.row.id === exceptMemberId) return false;
+  if (exceptId && found.kind === exceptKind && found.row.id === exceptId) return false;
   return true;
 }
 
-export async function mobileTaken(mobile, exceptMemberId) {
+export async function mobileTaken(mobile, exceptId, exceptKind = "member") {
   const found = await findByMobile(mobile);
   if (!found) return false;
-  if (exceptMemberId && found.kind === "member" && found.row.id === exceptMemberId) return false;
+  if (exceptId && found.kind === exceptKind && found.row.id === exceptId) return false;
   return true;
 }
 
@@ -178,23 +178,18 @@ export async function saveInstitutionProfile(id, name, type) {
   await institutions().updateOne({ id }, { $set: { name, type } });
 }
 
+export async function saveAdminAccount(id, fields) {
+  await institutions().updateOne({ id }, { $set: fields });
+}
+
 export async function savePassword(kind, id, passwordHash) {
   const collection = kind === "admin" ? institutions() : members();
   await collection.updateOne({ id }, { $set: { passwordHash } });
 }
 
 export async function updateMemberProfile(id, fields) {
-  const $set = {
-    mobile: fields.mobile,
-    city: fields.city,
-    occupation: fields.occupation,
-    links: fields.links,
-  };
-  if (Object.prototype.hasOwnProperty.call(fields, "photo")) {
-    $set.photo = fields.photo || "";
-    $set.photoId = fields.photoId || "";
-  }
-  await members().updateOne({ id }, { $set });
+  if (!fields || !Object.keys(fields).length) return;
+  await members().updateOne({ id }, { $set: fields });
 }
 
 export async function saveMemberPhoto(id, photo, photoId) {

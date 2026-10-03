@@ -1,10 +1,10 @@
 import { useEffect, useId, useState } from "react";
+import { formatDate, genderLabel, LangToggle, useI18n } from "./i18n";
 
 export const initials = (name) =>
   (name || "?").trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
 
-export const fmtDate = (ts) =>
-  new Date(ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+export const fmtDate = (ts, lang = "en") => formatDate(lang, ts);
 
 export const safeUrl = (url) => (/^https?:\/\//i.test(url || "") ? url : `https://${url || ""}`);
 
@@ -13,6 +13,7 @@ const ICONS = {
   batches: "M5 4h4v16H5zM10 4h4v16h-4zM15.5 4.5l3.8-1 3.9 15.4-3.8 1z",
   link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2",
   members: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6",
+  profile: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21v-1a8 8 0 0 1 16 0v1",
   logout: "M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10",
   chevron: "M9 6l6 6-6 6",
   close: "M6 6l12 12M18 6L6 18",
@@ -47,6 +48,7 @@ export function Avatar({ name, photo, large }) {
 }
 
 export function PhotoPicker({ name, photo, file, onFile, onClear }) {
+  const { t } = useI18n();
   const inputId = useId();
   const [preview, setPreview] = useState("");
   const shown = file ? preview : (photo || "");
@@ -63,11 +65,11 @@ export function PhotoPicker({ name, photo, file, onFile, onClear }) {
     event.target.value = "";
     if (!next) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(next.type)) {
-      onFile(null, "Use a JPG, PNG, or WebP image.");
+      onFile(null, t("badImage"));
       return;
     }
     if (next.size > 2 * 1024 * 1024) {
-      onFile(null, "Image must be 2 MB or smaller.");
+      onFile(null, t("imageTooBig"));
       return;
     }
     onFile(next, "");
@@ -80,11 +82,11 @@ export function PhotoPicker({ name, photo, file, onFile, onClear }) {
       <Avatar name={name} photo={shown} large />
       <div>
         <div className="photo-actions">
-          <label className="btn ghost sm" htmlFor={inputId}>{shown ? "Change picture" : "Upload profile picture"}</label>
-          {shown && onClear && <button type="button" className="btn ghost sm" onClick={clear}>Remove</button>}
+          <label className="btn ghost sm" htmlFor={inputId}>{shown ? t("changePicture") : t("uploadPicture")}</label>
+          {shown && onClear && <button type="button" className="btn ghost sm" onClick={clear}>{t("remove")}</button>}
         </div>
         <input id={inputId} className="file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={choose} />
-        <p className="sub">JPG, PNG, or WebP, up to 2 MB.</p>
+        <p className="sub">{t("imageHint")}</p>
       </div>
     </div>
   );
@@ -101,6 +103,7 @@ export function Field({ label, children, hint }) {
 }
 
 export function PasswordField({ label, value, onChange, autoComplete, placeholder }) {
+  const { t } = useI18n();
   const [show, setShow] = useState(false);
   const id = useId();
   return (
@@ -111,12 +114,12 @@ export function PasswordField({ label, value, onChange, autoComplete, placeholde
           id={id}
           type={show ? "text" : "password"}
           autoComplete={autoComplete}
-          placeholder={placeholder || "At least 6 characters"}
+          placeholder={placeholder || t("pwPlaceholder")}
           value={value}
           onChange={onChange}
         />
-        <button type="button" onClick={() => setShow((open) => !open)} aria-label={show ? "Hide password" : "Show password"}>
-          {show ? "Hide" : "Show"}
+        <button type="button" onClick={() => setShow((open) => !open)} aria-label={show ? t("hidePassword") : t("showPassword")}>
+          {show ? t("hide") : t("show")}
         </button>
       </div>
     </div>
@@ -124,30 +127,35 @@ export function PasswordField({ label, value, onChange, autoComplete, placeholde
 }
 
 export function AuthShell({ children }) {
+  const { t } = useI18n();
   return (
     <div className="auth">
       <aside className="auth-art">
         <Brand />
         <div>
-          <p className="eyebrow light">The yearbook, online</p>
+          <p className="eyebrow light">{t("yearbookOnline")}</p>
           <div className="years" aria-hidden="true">
             <span>2001</span>
             <span className="on">2003</span>
             <span>2004</span>
             <span>2010</span>
           </div>
-          <p>Bring every batch back together. Create your school or college, add the years, and share one link.</p>
+          <p>{t("yearbookPitch")}</p>
         </div>
-        <p className="art-foot">Schools · Colleges · Batches</p>
+        <p className="art-foot">{t("artFoot")}</p>
       </aside>
       <div className="auth-form">
-        <div className="panel">{children}</div>
+        <div className="panel">
+          <div className="lang-row"><LangToggle tone="light" /></div>
+          {children}
+        </div>
       </div>
     </div>
   );
 }
 
 export function OtpInputs({ value, onChange }) {
+  const { t } = useI18n();
   const digits = value.padEnd(6, " ").slice(0, 6).split("");
   const setAt = (index, digit) => {
     onChange((current) => {
@@ -163,7 +171,7 @@ export function OtpInputs({ value, onChange }) {
           key={index}
           inputMode="numeric"
           autoComplete={index === 0 ? "one-time-code" : "off"}
-          aria-label={`Digit ${index + 1}`}
+          aria-label={t("digit", { n: index + 1 })}
           maxLength={1}
           value={digit.trim()}
           onChange={(event) => {
@@ -187,6 +195,7 @@ export function OtpInputs({ value, onChange }) {
 }
 
 export function Drawer({ title, onClose, children }) {
+  const { t } = useI18n();
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === "Escape") onClose();
@@ -202,10 +211,10 @@ export function Drawer({ title, onClose, children }) {
 
   return (
     <div className="scrim" onClick={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="drawer" role="dialog" aria-modal="true" aria-label={title || "Details"}>
+      <div className="drawer" role="dialog" aria-modal="true" aria-label={title || t("details")}>
         <div className="drawer-top">
           <span className="grab" aria-hidden="true" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
+          <button className="icon-btn" onClick={onClose} aria-label={t("close")}><Icon name="close" /></button>
         </div>
         {children}
       </div>
@@ -229,47 +238,48 @@ function KV({ rows }) {
 }
 
 export function MemberProfile({ member }) {
+  const { t, lang } = useI18n();
   return (
     <>
       <div className="d-top">
         <Avatar name={member.name} photo={member.photo} large />
         <div>
           <h2>{member.name}</h2>
-          <span className="tag">Batch {member.batch}</span>
-          <small>Joined {fmtDate(member.joinedAt)}</small>
+          <span className="tag">{t("batchTag", { year: member.batch })}</span>
+          <small>{t("joinedOn", { date: fmtDate(member.joinedAt, lang) })}</small>
         </div>
       </div>
       <section className="d-sec">
-        <h3>Contact</h3>
-        <KV rows={[["Mobile", member.mobile], ["Email", member.email], ["Date of birth", member.dob], ["Gender", member.gender], ["Blood group", member.blood]]} />
+        <h3>{t("contact")}</h3>
+        <KV rows={[[t("mobileNumber"), member.mobile], [t("emailId"), member.email], [t("dateOfBirth"), member.dob], [t("gender"), genderLabel(t, member.gender)], [t("bloodGroup"), member.blood]]} />
       </section>
       <section className="d-sec">
-        <h3>Family</h3>
-        <KV rows={[["Father", member.father], ["Mother", member.mother]]} />
+        <h3>{t("family")}</h3>
+        <KV rows={[[t("father"), member.father], [t("mother"), member.mother]]} />
       </section>
       <section className="d-sec">
-        <h3>Address</h3>
-        <KV rows={[["Current address", member.curAddr], ["City", member.city], ["Native address", member.nativeAddr]]} />
+        <h3>{t("address")}</h3>
+        <KV rows={[[t("currentAddress"), member.curAddr], [t("city"), member.city], [t("nativeAddress"), member.nativeAddr]]} />
       </section>
       <section className="d-sec">
-        <h3>Education</h3>
-        <KV rows={[["Qualification", member.qualification], ["Occupation", member.occupation]]} />
+        <h3>{t("education")}</h3>
+        <KV rows={[[t("qualification"), member.qualification], [t("occupation"), member.occupation]]} />
         {(member.schools || []).map((school, index) => (
           <div className="mini" key={`s${index}`}>
             <b>{school.name}</b>
-            <small>{["School", school.board, [school.from, school.to].filter(Boolean).join("–")].filter(Boolean).join(" · ")}</small>
+            <small>{[t("typeSchool"), school.board, [school.from, school.to].filter(Boolean).join("–")].filter(Boolean).join(" · ")}</small>
           </div>
         ))}
         {(member.colleges || []).map((college, index) => (
           <div className="mini" key={`c${index}`}>
             <b>{college.name}</b>
-            <small>{[college.degree || "College", college.from || college.to ? `${college.from}–${college.to}` : ""].filter(Boolean).join(" · ")}</small>
+            <small>{[college.degree || t("typeCollege"), college.from || college.to ? `${college.from}–${college.to}` : ""].filter(Boolean).join(" · ")}</small>
           </div>
         ))}
       </section>
       {!!member.businesses?.length && (
         <section className="d-sec">
-          <h3>Business</h3>
+          <h3>{t("business")}</h3>
           {member.businesses.map((business, index) => (
             <div className="mini" key={index}>
               <b>{business.name}</b>
@@ -283,10 +293,10 @@ export function MemberProfile({ member }) {
       )}
       {!!member.links?.length && (
         <section className="d-sec">
-          <h3>Links</h3>
+          <h3>{t("links")}</h3>
           {member.links.map((link, index) => (
             <div className="mini" key={index}>
-              <small>{link.label || "Link"}</small>
+              <small>{link.label || t("linkWord")}</small>
               <a href={safeUrl(link.url)} target="_blank" rel="noreferrer">{link.url}</a>
             </div>
           ))}
@@ -296,11 +306,13 @@ export function MemberProfile({ member }) {
   );
 }
 
-export function Loading({ label = "Opening your yearbook…" }) {
+export function Loading({ label }) {
+  const { t } = useI18n();
   return (
     <div className="loading">
+      <div className="lang-row"><LangToggle tone="light" /></div>
       <div className="brand-mark">P</div>
-      <p>{label}</p>
+      <p>{label || t("opening")}</p>
     </div>
   );
 }
