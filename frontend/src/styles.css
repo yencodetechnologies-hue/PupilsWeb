@@ -399,7 +399,7 @@ tbody tr:hover td { background: rgba(212, 175, 55, 0.12); }
   .split-form .btn { width: 100%; }
   .split-form .row { grid-template-columns: 1fr 1fr; gap: 10px; }
 
-  .spines { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px; }
+  .spines { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px; scroll-margin-bottom: 96px; }
   .spine { width: auto; height: 124px; }
   .spine .yr { font-size: 19px; }
   .spine > button { width: 32px; height: 32px; top: 0; right: 0; font-size: 18px; }

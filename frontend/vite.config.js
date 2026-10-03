@@ -9,6 +9,15 @@ export default defineConfig({
       "/api": {
         target: "https://pupilsweb.yencodetechnologies.in",
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            const cookies = proxyRes.headers["set-cookie"];
+            if (!cookies) return;
+            proxyRes.headers["set-cookie"] = cookies.map((cookie) =>
+              cookie.replace(/;\s*Secure/gi, "").replace(/;\s*SameSite=None/gi, "; SameSite=Lax")
+            );
+          });
+        },
       },
     },
   },

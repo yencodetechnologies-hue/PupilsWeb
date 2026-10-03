@@ -196,6 +196,9 @@ function Batches({ inst, members, onChange }) {
       onChange(data.institution);
       toast(`${data.added.length} batch${data.added.length > 1 ? "es" : ""} added`);
       clear();
+      requestAnimationFrame(() => {
+        document.querySelector(".spines")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
     } catch (error) {
       toast(error.message);
     } finally {
