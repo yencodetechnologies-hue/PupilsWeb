@@ -214,7 +214,10 @@ function Overview({ inst, members, setTab }) {
   const { t } = useI18n();
   const list = members || [];
   const week = Date.now() - 7 * 864e5;
-  const businesses = list.reduce((sum, member) => sum + (member.businesses?.length || 0), 0);
+  const businesses = list.reduce((sum, member) => {
+    const jobs = (member.currentJob?.orgName ? 1 : 0) + (member.previousJob?.orgName ? 1 : 0);
+    return sum + (jobs || member.businesses?.length || 0);
+  }, 0);
   const cities = new Set(list.map((member) => (member.city || "").trim().toLowerCase()).filter(Boolean)).size;
   const byBatch = [...inst.batches].sort((a, b) => b - a).map((year) => [year, list.filter((member) => member.batch === year).length]);
   const max = Math.max(1, ...byBatch.map((item) => item[1]));
@@ -451,7 +454,11 @@ function Members({ inst, members, setTab, onRemove }) {
     const needle = query.toLowerCase();
     return list.filter((member) =>
       (filter === "all" || member.batch === Number(filter)) &&
-      (!needle || [member.name, member.email, member.mobile, member.city, member.occupation, ...(member.businesses || []).map((item) => item.name)].join(" ").toLowerCase().includes(needle))
+      (!needle || [
+        member.memberNo, member.name, member.email, member.mobile, member.city, member.occupation,
+        member.currentJob?.orgName, member.previousJob?.orgName, member.spouseName,
+        ...(member.businesses || []).map((item) => item.name),
+      ].join(" ").toLowerCase().includes(needle))
     );
   }, [list, query, filter]);
 
@@ -518,12 +525,12 @@ function Members({ inst, members, setTab, onRemove }) {
                       <td>
                         <div className="who">
                           <Avatar name={member.name} photo={member.photo} />
-                          <div><b>{member.name}</b><small>{member.qualification}</small></div>
+                          <div><b>{member.name}</b><small>{member.memberNo || member.occupation || member.qualification}</small></div>
                         </div>
                       </td>
                       <td>{member.mobile}<small>{member.email}</small></td>
                       <td>{member.city || "—"}</td>
-                      <td>{member.businesses?.[0]?.name ? <span className="tag">{member.businesses[0].name}</span> : (member.occupation || "—")}</td>
+                      <td>{member.currentJob?.orgName || member.businesses?.[0]?.name ? <span className="tag">{member.currentJob?.orgName || member.businesses[0].name}</span> : (member.occupation || "—")}</td>
                       <td><small>{formatDate(lang, member.joinedAt)}</small></td>
                       <td><button className="btn ghost sm" onClick={() => setOpen(member.id)}>{t("view")}</button></td>
                     </tr>

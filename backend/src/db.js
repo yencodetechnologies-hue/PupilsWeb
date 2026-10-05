@@ -51,29 +51,84 @@ export function publicInst(row) {
   };
 }
 
+function addressOf(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    door: source.door || "",
+    street: source.street || "",
+    road: source.road || "",
+    area: source.area || "",
+    district: source.district || "",
+    state: source.state || "",
+    country: source.country || "",
+    pincode: source.pincode || "",
+  };
+}
+
+function jobOf(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    orgName: source.orgName || "",
+    designation: source.designation || "",
+    orgType: source.orgType || "",
+    contact: source.contact || "",
+  };
+}
+
+function studyOf(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    name: source.name || "",
+    year: source.year || "",
+    department: source.department || "",
+  };
+}
+
 export function publicMember(row) {
   if (!row) return null;
   return {
     id: row.id,
     instId: row.instId,
+    memberNo: row.memberNo || "",
     batch: Number(row.batch),
+    yearCompleted: row.yearCompleted || "",
+    classLeaving: row.classLeaving || "",
     name: row.name,
+    age: row.age || "",
     email: row.email,
     mobile: row.mobile,
     dob: row.dob || "",
     gender: row.gender || "",
     blood: row.blood || "",
     father: row.father || "",
+    fatherOccupation: row.fatherOccupation || "",
+    fatherCompany: row.fatherCompany || "",
     mother: row.mother || "",
+    motherOccupation: row.motherOccupation || "",
+    motherCompany: row.motherCompany || "",
+    curAddress: addressOf(row.curAddress),
+    nativeAddress: addressOf(row.nativeAddress),
     curAddr: row.curAddr || "",
     city: row.city || "",
     nativeAddr: row.nativeAddr || "",
     qualification: row.qualification || "",
     occupation: row.occupation || "",
+    siblings: Array.isArray(row.siblings) ? row.siblings : [],
+    otherSchools: Array.isArray(row.otherSchools) ? row.otherSchools : [],
     schools: Array.isArray(row.schools) ? row.schools : [],
     colleges: Array.isArray(row.colleges) ? row.colleges : [],
+    currentJob: jobOf(row.currentJob),
+    previousJob: jobOf(row.previousJob),
+    collegeUg: studyOf(row.collegeUg),
+    collegePg: studyOf(row.collegePg),
     businesses: Array.isArray(row.businesses) ? row.businesses : [],
     links: Array.isArray(row.links) ? row.links : [],
+    maritalStatus: row.maritalStatus || "",
+    spouseName: row.spouseName || "",
+    spouseOccupation: row.spouseOccupation || "",
+    spouseCompany: row.spouseCompany || "",
+    kidsCount: row.kidsCount || "",
+    kids: Array.isArray(row.kids) ? row.kids : [],
     photo: row.photo || "",
     joinedAt: Number(row.joinedAt),
   };
@@ -136,8 +191,12 @@ export async function insertMember(row) {
   await members().insertOne({
     id: row.id,
     instId: row.instId,
+    memberNo: row.memberNo || "",
     batch: row.batch,
+    yearCompleted: row.yearCompleted || "",
+    classLeaving: row.classLeaving || "",
     name: row.name,
+    age: row.age || "",
     email: String(row.email).toLowerCase(),
     mobile: row.mobile,
     passwordHash: row.passwordHash,
@@ -145,20 +204,58 @@ export async function insertMember(row) {
     gender: row.gender || "",
     blood: row.blood || "",
     father: row.father || "",
+    fatherOccupation: row.fatherOccupation || "",
+    fatherCompany: row.fatherCompany || "",
     mother: row.mother || "",
+    motherOccupation: row.motherOccupation || "",
+    motherCompany: row.motherCompany || "",
+    curAddress: addressOf(row.curAddress),
+    nativeAddress: addressOf(row.nativeAddress),
     curAddr: row.curAddr || "",
     city: row.city || "",
     nativeAddr: row.nativeAddr || "",
     qualification: row.qualification || "",
     occupation: row.occupation || "",
+    siblings: row.siblings || [],
+    otherSchools: row.otherSchools || [],
     schools: row.schools || [],
     colleges: row.colleges || [],
+    currentJob: jobOf(row.currentJob),
+    previousJob: jobOf(row.previousJob),
+    collegeUg: studyOf(row.collegeUg),
+    collegePg: studyOf(row.collegePg),
     businesses: row.businesses || [],
     links: row.links || [],
+    maritalStatus: row.maritalStatus || "",
+    spouseName: row.spouseName || "",
+    spouseOccupation: row.spouseOccupation || "",
+    spouseCompany: row.spouseCompany || "",
+    kidsCount: row.kidsCount || "",
+    kids: row.kids || [],
     photo: row.photo || "",
     photoId: row.photoId || "",
     joinedAt: row.joinedAt,
   });
+}
+
+export async function memberNoTaken(instId, memberNo, exceptId) {
+  if (!memberNo) return false;
+  const found = await members().findOne({
+    instId,
+    memberNo,
+    ...(exceptId ? { id: { $ne: exceptId } } : {}),
+  });
+  return Boolean(found);
+}
+
+export async function nextMemberNo(instId) {
+  const rows = await members().find({ instId }, { projection: { _id: 0, memberNo: 1 } }).toArray();
+  let max = 0;
+  for (const row of rows) {
+    const value = String(row.memberNo || "").trim();
+    if (/^\d+$/.test(value)) max = Math.max(max, Number(value));
+  }
+  return String(max + 1);
 }
 
 export async function membersFor(instId) {

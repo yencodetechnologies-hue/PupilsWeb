@@ -15,8 +15,10 @@ import {
   getMemberById,
   insertInstitution,
   insertMember,
+  memberNoTaken,
   membersFor,
   mobileTaken,
+  nextMemberNo,
   publicInst,
   publicMember,
   saveMemberPhoto,
@@ -38,8 +40,17 @@ import {
   BLOOD,
   GENDERS,
   HttpError,
+  MARITAL,
   TYPES,
+  addressLine,
+  ageFromDob,
+  cleanAddress,
+  cleanAge,
+  cleanJob,
+  cleanKidsCount,
   cleanList,
+  cleanSiblings,
+  cleanStudy,
   clearCookieOpts,
   cookieOpts,
   fmtDate,
@@ -373,21 +384,103 @@ app.delete("/api/members/:id", admin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+function profileDetails(body) {
+  const dob = text(body.dob, 20);
+  const curAddress = cleanAddress(body.curAddress);
+  const nativeAddress = cleanAddress(body.nativeAddress);
+  const currentJob = cleanJob(body.currentJob);
+  const previousJob = cleanJob(body.previousJob);
+  return {
+    yearCompleted: text(body.yearCompleted, 10),
+    classLeaving: text(body.classLeaving, 40),
+    age: ageFromDob(dob) || cleanAge(body.age),
+    dob,
+    gender: GENDERS.includes(body.gender) ? body.gender : "",
+    blood: BLOOD.includes(body.blood) ? body.blood : "",
+    father: text(body.father, 80),
+    fatherOccupation: text(body.fatherOccupation, 120),
+    fatherCompany: text(body.fatherCompany, 160),
+    mother: text(body.mother, 80),
+    motherOccupation: text(body.motherOccupation, 120),
+    motherCompany: text(body.motherCompany, 160),
+    curAddress,
+    nativeAddress,
+    curAddr: addressLine(curAddress),
+    nativeAddr: addressLine(nativeAddress),
+    city: text(curAddress.district, 80),
+    siblings: cleanSiblings(body.siblings),
+    otherSchools: cleanList(body.otherSchools, ["name", "yearCompleted", "classLeaving"], 8),
+    currentJob,
+    previousJob,
+    collegeUg: cleanStudy(body.collegeUg),
+    collegePg: cleanStudy(body.collegePg),
+    occupation: text(currentJob.designation, 120),
+    maritalStatus: MARITAL.includes(body.maritalStatus) ? body.maritalStatus : "",
+    spouseName: text(body.spouseName, 80),
+    spouseOccupation: text(body.spouseOccupation, 120),
+    spouseCompany: text(body.spouseCompany, 160),
+    kidsCount: cleanKidsCount(body.kidsCount),
+    kids: cleanList(body.kids, ["name", "dob", "school", "classYear"], 4),
+  };
+}
+
+function jobCell(job) {
+  return [job?.orgName, job?.designation, job?.orgType, job?.contact].filter(Boolean).join(" · ");
+}
+
+function studyCell(study) {
+  return [study?.name, study?.year, study?.department].filter(Boolean).join(" · ");
+}
+
 app.get("/api/members/export.csv", admin, wrap(async (req, res) => {
   const inst = publicInst(req.inst);
   const members = (await membersFor(req.inst.id)).sort((a, b) => a.batch - b.batch || a.name.localeCompare(b.name));
-  const cols = ["batch", "name", "email", "mobile", "photo", "dob", "gender", "blood", "father", "mother", "curAddr", "city", "nativeAddr", "qualification", "occupation"];
   const q = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const headers = [
+    "memberNo", "yearJoined", "yearCompleted", "classLeaving", "name", "age", "gender", "dob", "mobile", "blood", "email",
+    "currentAddress", "nativeAddress", "city",
+    "father", "fatherOccupation", "fatherCompany", "mother", "motherOccupation", "motherCompany",
+    "siblings", "otherSchools", "currentJob", "previousJob", "collegeUg", "collegePg",
+    "maritalStatus", "spouseName", "spouseOccupation", "spouseCompany", "kidsCount", "kids", "joined",
+  ];
   const lines = [
-    [...cols, "schools", "colleges", "businesses", "links", "joined"].join(","),
+    headers.join(","),
     ...members.map((member) => [
-      ...cols.map((col) => q(member[col])),
-      q((member.schools || []).map((item) => item.name).join("; ")),
-      q((member.colleges || []).map((item) => item.name).join("; ")),
-      q((member.businesses || []).map((item) => item.name).join("; ")),
-      q((member.links || []).map((item) => item.url).join("; ")),
-      q(fmtDate(member.joinedAt)),
-    ].join(",")),
+      member.memberNo,
+      member.batch,
+      member.yearCompleted,
+      member.classLeaving,
+      member.name,
+      member.age,
+      member.gender,
+      member.dob,
+      member.mobile,
+      member.blood,
+      member.email,
+      addressLine(member.curAddress) || member.curAddr,
+      addressLine(member.nativeAddress) || member.nativeAddr,
+      member.city,
+      member.father,
+      member.fatherOccupation,
+      member.fatherCompany,
+      member.mother,
+      member.motherOccupation,
+      member.motherCompany,
+      (member.siblings || []).map((item) => [item.name, item.gender, item.dob, item.org, item.alumniId].filter(Boolean).join(" · ")).join("; "),
+      (member.otherSchools || []).map((item) => [item.name, item.yearCompleted, item.classLeaving].filter(Boolean).join(" · ")).join("; ")
+        || (member.schools || []).map((item) => item.name).join("; "),
+      jobCell(member.currentJob) || (member.businesses || []).map((item) => item.name).join("; "),
+      jobCell(member.previousJob),
+      studyCell(member.collegeUg) || (member.colleges || []).map((item) => item.name).join("; "),
+      studyCell(member.collegePg),
+      member.maritalStatus,
+      member.spouseName,
+      member.spouseOccupation,
+      member.spouseCompany,
+      member.kidsCount,
+      (member.kids || []).map((item) => [item.name, item.dob, item.school, item.classYear].filter(Boolean).join(" · ")).join("; "),
+      fmtDate(member.joinedAt),
+    ].map(q).join(",")),
   ];
   const filename = `${inst.name.replace(/[^\w]+/g, "-")}-alumni.csv`;
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -414,46 +507,34 @@ app.post("/api/join/:code", wrap(async (req, res) => {
   const email = text(body.email, 160).toLowerCase();
   const mobile = normMobile(body.mobile);
   const password = assertPassword(body.pw);
-  const father = text(body.father, 80);
-  const mother = text(body.mother, 80);
-  const city = text(body.city, 80);
-  const qualification = text(body.qualification, 120);
-  const gender = GENDERS.includes(body.gender) ? body.gender : "";
-  const blood = BLOOD.includes(body.blood) ? body.blood : "";
+  const details = profileDetails(body);
   const picture = body.photo || body.photoId ? acceptPhoto(body.photo, body.photoId) : { photo: "", photoId: "" };
+  let memberNo = text(body.memberNo, 40);
+  if (!memberNo) memberNo = await nextMemberNo(inst.id);
 
   if (!pub.batches.includes(batch)) throw new HttpError(400, "Select your batch.");
   if (!name) throw new HttpError(400, "Enter your full name.");
   if (!isEmail(email)) throw new HttpError(400, "Enter a valid email ID.");
   if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
-  if (!father || !mother) throw new HttpError(400, "Enter your father's and mother's names.");
-  if (!city) throw new HttpError(400, "Enter your current city.");
-  if (!qualification) throw new HttpError(400, "Enter your highest qualification.");
+  if (!details.father || !details.mother) throw new HttpError(400, "Enter your father's and mother's names.");
   if (await emailTaken(email)) throw new HttpError(400, "This email is already registered. Sign in instead.");
   if (await mobileTaken(mobile)) throw new HttpError(400, "This mobile number is already registered.");
+  if (await memberNoTaken(inst.id, memberNo)) throw new HttpError(400, "This alumni member number is already used.");
 
   const row = {
     id: makeId(),
     instId: inst.id,
+    memberNo,
     batch,
     name,
     email,
     mobile,
     passwordHash: await bcrypt.hash(password, 10),
-    dob: text(body.dob, 20),
-    gender,
-    blood,
-    father,
-    mother,
-    curAddr: text(body.curAddr, 400),
-    city,
-    nativeAddr: text(body.nativeAddr, 400),
-    qualification,
-    occupation: text(body.occupation, 120),
-    schools: cleanList(body.schools, ["name", "board", "from", "to"]),
-    colleges: cleanList(body.colleges, ["name", "degree", "from", "to"]),
-    businesses: cleanList(body.businesses, ["name", "industry", "role", "city", "phone", "web", "desc"]),
-    links: cleanList(body.links, ["label", "url"]),
+    ...details,
+    schools: [],
+    colleges: [],
+    businesses: [],
+    links: [],
     photo: picture.photo,
     photoId: picture.photoId,
     joinedAt: Date.now(),
@@ -498,20 +579,24 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
     if (!years.includes(batch)) throw new HttpError(400, "Select your batch.");
     fields.batch = batch;
   }
-  if (has("father")) fields.father = text(body.father, 80);
-  if (has("mother")) fields.mother = text(body.mother, 80);
-  if (has("city")) fields.city = text(body.city, 80);
-  if (has("qualification")) fields.qualification = text(body.qualification, 120);
-  if (has("occupation")) fields.occupation = text(body.occupation, 120);
-  if (has("dob")) fields.dob = text(body.dob, 20);
-  if (has("gender")) fields.gender = GENDERS.includes(body.gender) ? body.gender : "";
-  if (has("blood")) fields.blood = BLOOD.includes(body.blood) ? body.blood : "";
-  if (has("curAddr")) fields.curAddr = text(body.curAddr, 400);
-  if (has("nativeAddr")) fields.nativeAddr = text(body.nativeAddr, 400);
-  if (has("schools")) fields.schools = cleanList(body.schools, ["name", "board", "from", "to"]);
-  if (has("colleges")) fields.colleges = cleanList(body.colleges, ["name", "degree", "from", "to"]);
-  if (has("businesses")) fields.businesses = cleanList(body.businesses, ["name", "industry", "role", "city", "phone", "web", "desc"]);
-  if (has("links")) fields.links = cleanList(body.links, ["label", "url"]);
+  if (has("memberNo") || has("curAddress")) {
+    let memberNo = text(body.memberNo, 40);
+    if (!memberNo) memberNo = req.member.memberNo || await nextMemberNo(req.member.instId);
+    if (await memberNoTaken(req.member.instId, memberNo, req.member.id)) {
+      throw new HttpError(400, "This alumni member number is already used.");
+    }
+    fields.memberNo = memberNo;
+  }
+  if (has("curAddress") || has("father") || has("currentJob") || has("siblings") || has("kids")) {
+    const details = profileDetails(body);
+    if (has("father") && !details.father) throw new HttpError(400, "Enter your father's name.");
+    if (has("mother") && !details.mother) throw new HttpError(400, "Enter your mother's name.");
+    if (!details.curAddr) delete details.curAddr;
+    if (!details.nativeAddr) delete details.nativeAddr;
+    if (!details.city) delete details.city;
+    if (!details.occupation) delete details.occupation;
+    Object.assign(fields, details);
+  }
 
   let replacedId = "";
   if (has("photo")) {

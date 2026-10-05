@@ -6,6 +6,8 @@ export const SECRET = process.env.JWT_SECRET || "alumni-connect-dev-secret";
 export const TYPES = ["School", "College", "Other"];
 export const BLOOD = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
 export const GENDERS = ["Male", "Female", "Prefer not to say"];
+export const MARITAL = ["Single", "Married", "Widowed", "Divorced"];
+export const SIBLING_GENDERS = ["Male", "Female"];
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -78,6 +80,74 @@ export const clearCookieOpts = {
   secure: true,
   path: "/",
 };
+
+export function ageFromDob(dob) {
+  if (!dob) return "";
+  const date = new Date(`${dob}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const month = now.getMonth() - date.getMonth();
+  if (month < 0 || (month === 0 && now.getDate() < date.getDate())) age -= 1;
+  if (age < 0 || age > 120) return "";
+  return String(age);
+}
+
+export function cleanAge(value) {
+  const digits = String(value ?? "").replace(/\D/g, "").slice(0, 3);
+  if (!digits) return "";
+  const age = Number(digits);
+  if (age > 120) return "";
+  return String(age);
+}
+
+export function cleanKidsCount(value) {
+  const digits = String(value ?? "").replace(/\D/g, "").slice(0, 2);
+  if (!digits) return "";
+  return String(Math.min(20, Number(digits)));
+}
+
+export function cleanAddress(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const next = {};
+  for (const key of ["door", "street", "road", "area", "district", "state", "country", "pincode"]) {
+    next[key] = text(source[key], key === "pincode" ? 12 : 120);
+  }
+  return next;
+}
+
+export function addressLine(addr) {
+  return ["door", "street", "road", "area", "district", "state", "country", "pincode"]
+    .map((key) => addr?.[key])
+    .filter(Boolean)
+    .join(", ");
+}
+
+export function cleanJob(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    orgName: text(source.orgName, 160),
+    designation: text(source.designation, 120),
+    orgType: text(source.orgType, 120),
+    contact: text(source.contact, 400),
+  };
+}
+
+export function cleanStudy(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    name: text(source.name, 160),
+    year: text(source.year, 20),
+    department: text(source.department, 120),
+  };
+}
+
+export function cleanSiblings(items) {
+  return cleanList(items, ["name", "gender", "dob", "org", "alumniId"], 2).map((item) => ({
+    ...item,
+    gender: SIBLING_GENDERS.includes(item.gender) ? item.gender : "",
+  }));
+}
 
 export function cleanList(items, keys, limit = 12) {
   if (!Array.isArray(items)) return [];

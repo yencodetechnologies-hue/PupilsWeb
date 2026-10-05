@@ -311,8 +311,8 @@ tbody tr:hover td { background: rgba(212, 175, 55, 0.12); }
 .join-hero p { color: rgba(255,255,255,0.76); margin: 8px 0 0; }
 .join-body { margin-top: -56px; position: relative; z-index: 1; }
 .wizard h2 { font-size: 30px; margin-bottom: 6px; }
-.wizard-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
-.wizard-steps button { border: 0; background: transparent; text-align: left; padding: 0; color: var(--muted); font-weight: 800; cursor: pointer; }
+.wizard-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+.wizard-steps button { border: 0; background: transparent; text-align: left; padding: 0; color: var(--muted); font-weight: 800; cursor: pointer; min-width: 0; overflow-wrap: anywhere; }
 .wizard-steps button:disabled { cursor: default; }
 .wizard-steps i { display: block; height: 4px; border-radius: 99px; background: var(--line); margin-bottom: 6px; }
 .wizard-steps button.on { color: var(--ink); }

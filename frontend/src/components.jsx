@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import { formatDate, genderLabel, LangToggle, useI18n } from "./i18n";
+import { formatDate, genderLabel, LangToggle, maritalLabel, useI18n } from "./i18n";
+import { addressLine, spouseLabelKeys } from "./memberShape";
 
 export const initials = (name) =>
   (name || "?").trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
@@ -237,8 +238,30 @@ function KV({ rows }) {
   );
 }
 
+function parentLine(name, occupation, company) {
+  return [name, occupation, company].filter(Boolean).join(" · ");
+}
+
+function JobView({ job }) {
+  if (!job?.orgName && !job?.designation && !job?.orgType && !job?.contact) return null;
+  const meta = [job.orgName ? job.designation : "", job.orgType].filter(Boolean).join(" · ");
+  return (
+    <div className="mini">
+      <b>{job.orgName || job.designation}</b>
+      {meta && <small>{meta}</small>}
+      {job.contact && <p>{job.contact}</p>}
+    </div>
+  );
+}
+
 export function MemberProfile({ member }) {
   const { t, lang } = useI18n();
+  const spouse = spouseLabelKeys(member.gender);
+  const currentAddress = addressLine(member.curAddress) || member.curAddr;
+  const nativeAddress = addressLine(member.nativeAddress) || member.nativeAddr;
+  const schools = member.otherSchools?.length ? member.otherSchools : (member.schools || []);
+  const hasStudy = member.collegeUg?.name || member.collegePg?.name;
+  const hasJob = member.currentJob?.orgName || member.currentJob?.designation || member.previousJob?.orgName || member.previousJob?.designation;
   return (
     <>
       <div className="d-top">
@@ -246,41 +269,96 @@ export function MemberProfile({ member }) {
         <div>
           <h2>{member.name}</h2>
           <span className="tag">{t("batchTag", { year: member.batch })}</span>
-          <small>{t("joinedOn", { date: fmtDate(member.joinedAt, lang) })}</small>
+          <small>
+            {[member.memberNo ? `${t("memberNo")} ${member.memberNo}` : "", t("joinedOn", { date: fmtDate(member.joinedAt, lang) })].filter(Boolean).join(" · ")}
+          </small>
         </div>
       </div>
       <section className="d-sec">
-        <h3>{t("contact")}</h3>
-        <KV rows={[[t("mobileNumber"), member.mobile], [t("emailId"), member.email], [t("dateOfBirth"), member.dob], [t("gender"), genderLabel(t, member.gender)], [t("bloodGroup"), member.blood]]} />
+        <h3>{t("membershipTitle")}</h3>
+        <KV rows={[
+          [t("memberNo"), member.memberNo],
+          [t("yearJoined"), member.batch ? String(member.batch) : ""],
+          [t("yearCompleted"), member.yearCompleted],
+          [t("classLeaving"), member.classLeaving],
+          [t("age"), member.age],
+          [t("gender"), genderLabel(t, member.gender)],
+          [t("dateOfBirth"), member.dob],
+          [t("bloodGroup"), member.blood],
+        ]} />
       </section>
       <section className="d-sec">
-        <h3>{t("family")}</h3>
-        <KV rows={[[t("father"), member.father], [t("mother"), member.mother]]} />
+        <h3>{t("contact")}</h3>
+        <KV rows={[[t("mobileNumber"), member.mobile], [t("emailId"), member.email]]} />
       </section>
       <section className="d-sec">
         <h3>{t("address")}</h3>
-        <KV rows={[[t("currentAddress"), member.curAddr], [t("city"), member.city], [t("nativeAddress"), member.nativeAddr]]} />
+        <KV rows={[[t("currentAddress"), currentAddress], [t("nativeAddress"), nativeAddress], [t("city"), member.city]]} />
+      </section>
+      <section className="d-sec">
+        <h3>{t("family")}</h3>
+        <KV rows={[
+          [t("father"), parentLine(member.father, member.fatherOccupation, member.fatherCompany)],
+          [t("mother"), parentLine(member.mother, member.motherOccupation, member.motherCompany)],
+          [t("maritalStatus"), maritalLabel(t, member.maritalStatus)],
+          [t(spouse.name), member.spouseName],
+          [t(spouse.occupation), member.spouseOccupation],
+          [t(spouse.company), member.spouseCompany],
+          [t("kidsCount"), member.kidsCount],
+        ]} />
+        {(member.siblings || []).map((item, index) => (
+          <div className="mini" key={`sib${index}`}>
+            <b>{item.name}</b>
+            <small>{[genderLabel(t, item.gender), item.dob, item.org, item.alumniId ? `${t("alumniId")} ${item.alumniId}` : ""].filter(Boolean).join(" · ")}</small>
+          </div>
+        ))}
+        {(member.kids || []).map((item, index) => (
+          <div className="mini" key={`kid${index}`}>
+            <b>{item.name}</b>
+            <small>{[item.dob, item.school, item.classYear].filter(Boolean).join(" · ")}</small>
+          </div>
+        ))}
       </section>
       <section className="d-sec">
         <h3>{t("education")}</h3>
-        <KV rows={[[t("qualification"), member.qualification], [t("occupation"), member.occupation]]} />
-        {(member.schools || []).map((school, index) => (
+        <KV rows={[[t("qualification"), member.qualification]]} />
+        {schools.filter((school) => school.name).map((school, index) => (
           <div className="mini" key={`s${index}`}>
             <b>{school.name}</b>
-            <small>{[t("typeSchool"), school.board, [school.from, school.to].filter(Boolean).join("–")].filter(Boolean).join(" · ")}</small>
+            <small>{[school.yearCompleted || school.board, school.classLeaving || [school.from, school.to].filter(Boolean).join("–")].filter(Boolean).join(" · ")}</small>
           </div>
         ))}
-        {(member.colleges || []).map((college, index) => (
+        {hasStudy ? (
+          <>
+            {member.collegeUg?.name && (
+              <div className="mini">
+                <b>{member.collegeUg.name}</b>
+                <small>{[t("collegeUg"), member.collegeUg.year, member.collegeUg.department].filter(Boolean).join(" · ")}</small>
+              </div>
+            )}
+            {member.collegePg?.name && (
+              <div className="mini">
+                <b>{member.collegePg.name}</b>
+                <small>{[t("collegePg"), member.collegePg.year, member.collegePg.department].filter(Boolean).join(" · ")}</small>
+              </div>
+            )}
+          </>
+        ) : (member.colleges || []).map((college, index) => (
           <div className="mini" key={`c${index}`}>
             <b>{college.name}</b>
             <small>{[college.degree || t("typeCollege"), college.from || college.to ? `${college.from}–${college.to}` : ""].filter(Boolean).join(" · ")}</small>
           </div>
         ))}
       </section>
-      {!!member.businesses?.length && (
+      {(hasJob || !!member.businesses?.length) && (
         <section className="d-sec">
           <h3>{t("business")}</h3>
-          {member.businesses.map((business, index) => (
+          {hasJob ? (
+            <>
+              <JobView job={member.currentJob} />
+              <JobView job={member.previousJob} />
+            </>
+          ) : member.businesses.map((business, index) => (
             <div className="mini" key={index}>
               <b>{business.name}</b>
               {business.industry && <small> · {business.industry}</small>}
