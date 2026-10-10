@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, uploadPhoto } from "../api";
-import { Brand, ErrBox, Loading, PasswordField, PhotoPicker } from "../components";
+import { api } from "../api";
+import { Brand, ErrBox, Field, Loading, PasswordField } from "../components";
 import { LangToggle, typeLabel, useI18n } from "../i18n";
-import { AddressFields, FamilyFields, MembershipFields, WorkFields } from "../memberForm";
-import { emptyMemberForm } from "../memberShape";
 import { useAuth } from "../state";
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const isMobile = (value) => /^[6-9]\d{9}$/.test(String(value).replace(/\D/g, "").slice(-10));
-const STEPS = ["stepMembership", "stepAddress", "stepFamily", "stepWork"];
 
 export function Join() {
   const { t } = useI18n();
@@ -54,68 +51,54 @@ export function Join() {
   return (
     <>
       {bar}
-      <JoinWizard inst={inst} preview={preview} onDone={() => navigate(preview ? "/app" : "/")} />
+      <JoinAccount inst={inst} preview={preview} onDone={() => navigate("/app")} />
     </>
   );
 }
 
-function JoinWizard({ inst, preview, onDone }) {
+function JoinAccount({ inst, preview, onDone }) {
   const { t } = useI18n();
-  const [step, setStep] = useState(1);
+  const { setSession } = useAuth();
+  const navigate = useNavigate();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(null);
-  const [form, setForm] = useState(emptyMemberForm);
-  const [pw, setPw] = useState("");
-  const [photoFile, setPhotoFile] = useState(null);
-
-  const next = () => {
-    let message = "";
-    if (step === 1) {
-      if (!form.batch) message = t("selectBatch");
-      else if (!form.name.trim()) message = t("enterName");
-      else if (!isEmail(form.email)) message = t("badEmail");
-      else if (!isMobile(form.mobile)) message = t("badMobile");
-      else if (pw.length < 6) message = t("shortPassword");
-    } else if (step === 3) {
-      if (!form.father.trim() || !form.mother.trim()) message = t("enterParents");
-    }
-    if (message) {
-      setErr(message);
-      return;
-    }
-    setErr("");
-    setStep((current) => current + 1);
-    window.scrollTo(0, 0);
-  };
+  const [form, setForm] = useState({ name: "", email: "", batch: "", mobile: "", pw: "", pw2: "" });
+  const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  const years = [...(inst.batches || [])].sort((a, b) => b - a);
 
   const submit = async (event) => {
     event.preventDefault();
-    if (step < 4) {
-      next();
-      return;
-    }
-    if (!form.father.trim() || !form.mother.trim()) {
-      setErr(t("enterParents"));
-      setStep(3);
-      return;
-    }
+    if (!form.name.trim()) return setErr(t("enterName"));
+    if (!isEmail(form.email)) return setErr(t("badEmail"));
+    if (!form.batch) return setErr(t("selectBatch"));
+    if (!isMobile(form.mobile)) return setErr(t("badMobile"));
+    if (form.pw.length < 6) return setErr(t("shortPassword"));
+    if (form.pw !== form.pw2) return setErr(t("passwordMismatch"));
     setBusy(true);
     setErr("");
     try {
-      let picture = { photo: "", photoId: "" };
-      if (photoFile) picture = await uploadPhoto(photoFile);
       const data = await api(`/api/join/${inst.code}`, {
         method: "POST",
         body: {
-          ...form,
-          pw,
-          photo: picture.photo || "",
-          photoId: picture.photoId || "",
+          name: form.name.trim(),
+          email: form.email.trim(),
+          batch: form.batch,
+          mobile: form.mobile,
+          pw: form.pw,
         },
       });
-      setJoined(data.member);
-      window.scrollTo(0, 0);
+      if (preview) {
+        setJoined(data.member);
+        window.scrollTo(0, 0);
+        return;
+      }
+      const session = await api("/api/auth/login", {
+        method: "POST",
+        body: { id: form.email.trim(), pw: form.pw },
+      });
+      setSession(session);
+      navigate("/home");
     } catch (error) {
       setErr(error.message);
     } finally {
@@ -132,7 +115,7 @@ function JoinWizard({ inst, preview, onDone }) {
           <h1>{t("youreIn", { name: joined.name.split(" ")[0] })}</h1>
           <p className="sub">{t("joinedBatch", { batch: joined.batch, name: inst.name })}</p>
           {joined.memberNo && <p className="sub">{t("memberNoAssigned", { n: joined.memberNo })}</p>}
-          <button className="btn" onClick={onDone}>{preview ? t("backDashboard") : t("signIn")}</button>
+          <button className="btn" onClick={onDone}>{t("backDashboard")}</button>
         </div>
       </div>
     );
@@ -147,73 +130,27 @@ function JoinWizard({ inst, preview, onDone }) {
         <h1>{inst.name}</h1>
         <p>{t("joinSteps")}</p>
       </header>
-      <form className="join-body card wizard" onSubmit={submit} noValidate>
-        <div className="wizard-steps">
-          {STEPS.map((key, index) => (
-            <button
-              key={key}
-              type="button"
-              className={step >= index + 1 ? "on" : ""}
-              onClick={() => index + 1 < step && setStep(index + 1)}
-              disabled={index + 1 > step}
-            >
-              <i />
-              <small>{t("stepN", { n: index + 1 })}</small>
-              {t(key)}
-            </button>
-          ))}
-        </div>
+      <form className="join-body card" onSubmit={submit} noValidate>
         <ErrBox msg={err} />
-
-        {step === 1 && (
-          <>
-            <PhotoPicker
-              name={form.name}
-              file={photoFile}
-              onFile={(file, message) => {
-                if (message) setErr(message);
-                else {
-                  setErr("");
-                  setPhotoFile(file);
-                }
-              }}
-              onClear={() => setPhotoFile(null)}
-            />
-            {!inst.batches.length && <ErrBox msg={t("noBatchesAdmin")} />}
-            <MembershipFields
-              form={form}
-              setForm={setForm}
-              batches={inst.batches}
-              password={<PasswordField label={t("password")} autoComplete="new-password" value={pw} onChange={(event) => setPw(event.target.value)} />}
-            />
-          </>
-        )}
-        {step === 2 && <AddressFields form={form} setForm={setForm} />}
-        {step === 3 && <FamilyFields form={form} setForm={setForm} />}
-        {step === 4 && (
-          <>
-            <WorkFields form={form} setForm={setForm} />
-            <div className="review">
-              <b>{form.name || t("yourName")}</b>
-              <span>
-                {form.memberNo ? `${t("memberNo")} ${form.memberNo} · ` : ""}
-                {t("batchTag", { year: form.batch || "—" })}
-                {" · "}
-                {form.curAddress.district || t("district")}
-                {form.currentJob.designation ? ` · ${form.currentJob.designation}` : ""}
-              </span>
-            </div>
-          </>
-        )}
-
-        <div className="wizard-actions">
-          {step > 1 && <button type="button" className="btn ghost" onClick={() => { setErr(""); setStep((current) => current - 1); }}>{t("back")}</button>}
-          {step < 4 ? (
-            <button type="button" className="btn brass" onClick={next}>{t("continue")}</button>
-          ) : (
-            <button className="btn brass" disabled={busy}>{busy ? t("joining") : t("joinBatch")}</button>
-          )}
-        </div>
+        {!inst.batches.length && <ErrBox msg={t("noBatchesAdmin")} />}
+        <Field label={t("fullName")}>
+          <input autoComplete="name" placeholder={t("fullName")} value={form.name} onChange={set("name")} />
+        </Field>
+        <Field label={t("emailId")}>
+          <input type="email" autoComplete="email" value={form.email} onChange={set("email")} />
+        </Field>
+        <Field label={t("batch")}>
+          <select value={form.batch} onChange={set("batch")}>
+            <option value="">{t("selectYourBatch")}</option>
+            {years.map((year) => <option key={year} value={year}>{t("batchTag", { year })}</option>)}
+          </select>
+        </Field>
+        <Field label={t("mobileNumber")}>
+          <input inputMode="tel" autoComplete="tel" placeholder="9876543210" value={form.mobile} onChange={set("mobile")} />
+        </Field>
+        <PasswordField label={t("password")} autoComplete="new-password" value={form.pw} onChange={set("pw")} />
+        <PasswordField label={t("confirmPassword")} autoComplete="new-password" value={form.pw2} onChange={set("pw2")} />
+        <button className="btn brass block" disabled={busy || !inst.batches.length}>{busy ? t("creating") : t("createAccount")}</button>
         <p className="alt">{t("alreadyJoined")} <Link to="/" className="link">{t("signIn")}</Link></p>
       </form>
     </div>

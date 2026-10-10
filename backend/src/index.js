@@ -516,7 +516,6 @@ app.post("/api/join/:code", wrap(async (req, res) => {
   if (!name) throw new HttpError(400, "Enter your full name.");
   if (!isEmail(email)) throw new HttpError(400, "Enter a valid email ID.");
   if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
-  if (!details.father || !details.mother) throw new HttpError(400, "Enter your father's and mother's names.");
   if (await emailTaken(email)) throw new HttpError(400, "This email is already registered. Sign in instead.");
   if (await mobileTaken(mobile)) throw new HttpError(400, "This mobile number is already registered.");
   if (await memberNoTaken(inst.id, memberNo)) throw new HttpError(400, "This alumni member number is already used.");
