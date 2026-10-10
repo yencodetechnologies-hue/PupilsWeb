@@ -32,6 +32,19 @@ function binders(setForm) {
   return { set, setNest, setRow };
 }
 
+export function BatchYearSelect({ value, years, onChange, placeholder }) {
+  const { t } = useI18n();
+  const list = [...(years || [])];
+  const known = list.map(Number);
+  return (
+    <select value={value} onChange={onChange}>
+      <option value="">{placeholder || t("select")}</option>
+      {value && !known.includes(Number(value)) && <option value={value}>{value}</option>}
+      {list.sort((a, b) => b - a).map((year) => <option key={year} value={year}>{t("batchTag", { year })}</option>)}
+    </select>
+  );
+}
+
 export function MembershipFields({ form, setForm, batches, password, lockIdentity }) {
   const { t } = useI18n();
   const { set } = binders(setForm);
@@ -42,7 +55,7 @@ export function MembershipFields({ form, setForm, batches, password, lockIdentit
       <h2>{t("membershipTitle")}</h2>
       <p className="sub">{t("membershipHint")}</p>
       <Field label={t("memberNo")} hint={t("memberNoHint")}>
-        <input value={form.memberNo} onChange={set("memberNo")} />
+        <input value={form.memberNo} readOnly disabled placeholder={t("memberNoAuto")} />
       </Field>
       <div className="row3">
         <Field label={t("yearJoined")}>
@@ -53,7 +66,7 @@ export function MembershipFields({ form, setForm, batches, password, lockIdentit
           </select>
         </Field>
         <Field label={t("yearCompleted")}>
-          <input inputMode="numeric" value={form.yearCompleted} onChange={set("yearCompleted")} />
+          <BatchYearSelect value={form.yearCompleted} years={years} onChange={set("yearCompleted")} />
         </Field>
         <Field label={t("classLeaving")}>
           <input value={form.classLeaving} onChange={set("classLeaving")} />

@@ -399,6 +399,14 @@ app.delete("/api/members/:id", admin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+function completedYear(value, batches, current = "") {
+  const year = String(value || "").trim();
+  if (!year) return "";
+  const allowed = new Set((batches || []).map((item) => String(item)));
+  if (allowed.has(year) || (current && year === String(current))) return year;
+  throw new HttpError(400, "Select a completed year from the batches.");
+}
+
 function profileDetails(body) {
   const dob = text(body.dob, 20);
   const curAddress = cleanAddress(body.curAddress);
@@ -509,6 +517,7 @@ app.get("/api/join/:code", wrap(async (req, res) => {
   const pub = publicInst(inst);
   res.json({
     institution: { id: pub.id, name: pub.name, type: pub.type, code: pub.code, batches: pub.batches },
+    nextMemberNo: await nextMemberNo(inst.id),
   });
 }));
 
@@ -523,9 +532,10 @@ app.post("/api/join/:code", wrap(async (req, res) => {
   const mobile = normMobile(body.mobile);
   const password = assertPassword(body.pw);
   const details = profileDetails(body);
+  details.yearCompleted = completedYear(details.yearCompleted, pub.batches);
   const picture = body.photo || body.photoId ? acceptPhoto(body.photo, body.photoId) : { photo: "", photoId: "" };
-  let memberNo = text(body.memberNo, 40);
-  if (!memberNo) memberNo = await nextMemberNo(inst.id);
+  let memberNo = await nextMemberNo(inst.id);
+  while (await memberNoTaken(inst.id, memberNo)) memberNo = String(Number(memberNo) + 1);
 
   if (!pub.batches.includes(batch)) throw new HttpError(400, "Select your batch.");
   if (!name) throw new HttpError(400, "Enter your full name.");
@@ -576,16 +586,12 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
     if (!years.includes(batch)) throw new HttpError(400, "Select your batch.");
     fields.batch = batch;
   }
-  if (has("memberNo") || has("curAddress")) {
-    let memberNo = text(body.memberNo, 40);
-    if (!memberNo) memberNo = req.member.memberNo || await nextMemberNo(req.member.instId);
-    if (await memberNoTaken(req.member.instId, memberNo, req.member.id)) {
-      throw new HttpError(400, "This alumni member number is already used.");
-    }
-    fields.memberNo = memberNo;
-  }
+  if (!req.member.memberNo) fields.memberNo = await nextMemberNo(req.member.instId);
   if (has("curAddress") || has("father") || has("currentJob") || has("siblings") || has("kids")) {
     const details = profileDetails(body);
+    const inst = await getInstById(req.member.instId);
+    const years = publicInst(inst)?.batches || [];
+    details.yearCompleted = completedYear(details.yearCompleted, years, req.member.yearCompleted);
     if (has("father") && !details.father) throw new HttpError(400, "Enter your father's name.");
     if (has("mother") && !details.mother) throw new HttpError(400, "Enter your mother's name.");
     if (!details.curAddr) delete details.curAddr;

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { Brand, ErrBox, Field, Loading, PasswordField } from "../components";
+import { BatchYearSelect } from "../memberForm";
 import { LangToggle, typeLabel, useI18n } from "../i18n";
 import { useAuth } from "../state";
 
@@ -15,10 +16,14 @@ export function Join() {
   const { session } = useAuth();
   const navigate = useNavigate();
   const [inst, setInst] = useState(undefined);
+  const [nextMemberNo, setNextMemberNo] = useState("");
 
   useEffect(() => {
     api(`/api/join/${code}`)
-      .then((data) => setInst(data.institution))
+      .then((data) => {
+        setInst(data.institution);
+        setNextMemberNo(data.nextMemberNo || "");
+      })
       .catch(() => setInst(null));
   }, [code]);
 
@@ -51,19 +56,19 @@ export function Join() {
   return (
     <>
       {bar}
-      <JoinAccount inst={inst} preview={preview} onDone={() => navigate("/app")} />
+      <JoinAccount inst={inst} nextMemberNo={nextMemberNo} preview={preview} onDone={() => navigate("/app")} />
     </>
   );
 }
 
-function JoinAccount({ inst, preview, onDone }) {
+function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
   const { t } = useI18n();
   const { setSession } = useAuth();
   const navigate = useNavigate();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", batch: "", mobile: "", pw: "", pw2: "" });
+  const [form, setForm] = useState({ name: "", email: "", batch: "", yearCompleted: "", mobile: "", pw: "", pw2: "" });
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const years = [...(inst.batches || [])].sort((a, b) => b - a);
 
@@ -84,6 +89,7 @@ function JoinAccount({ inst, preview, onDone }) {
           name: form.name.trim(),
           email: form.email.trim(),
           batch: form.batch,
+          yearCompleted: form.yearCompleted,
           mobile: form.mobile,
           pw: form.pw,
         },
@@ -133,6 +139,9 @@ function JoinAccount({ inst, preview, onDone }) {
       <form className="join-body card" onSubmit={submit} noValidate>
         <ErrBox msg={err} />
         {!inst.batches.length && <ErrBox msg={t("noBatchesAdmin")} />}
+        <Field label={t("memberNo")} hint={t("memberNoHint")}>
+          <input value={nextMemberNo} readOnly disabled placeholder={t("memberNoAuto")} />
+        </Field>
         <Field label={t("fullName")}>
           <input autoComplete="name" placeholder={t("fullName")} value={form.name} onChange={set("name")} />
         </Field>
@@ -144,6 +153,9 @@ function JoinAccount({ inst, preview, onDone }) {
             <option value="">{t("selectYourBatch")}</option>
             {years.map((year) => <option key={year} value={year}>{t("batchTag", { year })}</option>)}
           </select>
+        </Field>
+        <Field label={t("yearCompleted")}>
+          <BatchYearSelect value={form.yearCompleted} years={years} onChange={set("yearCompleted")} />
         </Field>
         <Field label={t("mobileNumber")}>
           <input inputMode="tel" autoComplete="tel" placeholder="9876543210" value={form.mobile} onChange={set("mobile")} />
