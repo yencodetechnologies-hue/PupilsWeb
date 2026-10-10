@@ -20,6 +20,7 @@ export function Dashboard() {
   const toast = useToast();
   const inst = session.institution;
   const [tab, setTab] = useState(inst.batches.length ? "overview" : "batches");
+  const [focusYear, setFocusYear] = useState(null);
   const [members, setMembers] = useState(null);
   const [loadErr, setLoadErr] = useState("");
 
@@ -33,7 +34,8 @@ export function Dashboard() {
 
   const applyInst = (institution) => updateInstitution(institution);
 
-  const go = (key) => { setTab(key); window.scrollTo(0, 0); };
+  const go = (key) => { setFocusYear(null); setTab(key); window.scrollTo(0, 0); };
+  const openBatch = (year) => { setFocusYear(year); setTab("members"); };
   const countFor = (key) => (key === "members" ? members?.length ?? 0 : key === "batches" ? inst.batches.length : null);
 
   const nav = TABS.map(([key, label]) => (
@@ -71,9 +73,18 @@ export function Dashboard() {
         <main className="main">
           {loadErr && <ErrBox msg={loadErr} />}
           {tab === "overview" && <Overview inst={inst} members={members} setTab={go} />}
-          {tab === "batches" && <Batches inst={inst} members={members || []} onChange={applyInst} />}
+          {tab === "batches" && <Batches inst={inst} members={members || []} onChange={applyInst} onOpen={openBatch} />}
           {tab === "link" && <JoinLink inst={inst} onChange={applyInst} />}
-          {tab === "members" && <Members inst={inst} members={members} setTab={go} onRemove={(id) => setMembers((list) => list.filter((item) => item.id !== id))} />}
+          {tab === "members" && (
+            <Members
+              inst={inst}
+              members={members}
+              setTab={go}
+              focusYear={focusYear}
+              onRemove={(id) => setMembers((list) => list.filter((item) => item.id !== id))}
+              onUpdate={(member) => setMembers((list) => list.map((item) => (item.id === member.id ? member : item)))}
+            />
+          )}
           {tab === "profile" && <AccountProfile inst={inst} onChange={applyInst} />}
         </main>
         <nav className="tabbar" aria-label={t("sections")}>
@@ -283,7 +294,7 @@ function Overview({ inst, members, setTab }) {
   );
 }
 
-function Batches({ inst, members, onChange }) {
+function Batches({ inst, members, onChange, onOpen }) {
   const { t } = useI18n();
   const toast = useToast();
   const [one, setOne] = useState("");
@@ -363,15 +374,20 @@ function Batches({ inst, members, onChange }) {
           </form>
         </div>
         {years.length ? (
-          <div className="spines">
-            {years.map((year) => (
-              <div className="spine" key={year}>
-                <button type="button" onClick={() => remove(year)} aria-label={t("removeBatch", { year })}>×</button>
-                <span className="yr">{year}</span>
-                <span className="n">{t("alumniCount", { n: members.filter((member) => member.batch === year).length })}</span>
-              </div>
-            ))}
-          </div>
+          <>
+            <p className="sub tight">{t("tapYearHint")}</p>
+            <div className="spines">
+              {years.map((year) => (
+                <div className="spine" key={year}>
+                  <button type="button" className="spine-x" onClick={() => remove(year)} aria-label={t("removeBatch", { year })}>×</button>
+                  <button type="button" className="spine-open" onClick={() => onOpen(year)} aria-label={t("openBatchAria", { year })}>
+                    <span className="yr">{year}</span>
+                    <span className="n">{t("alumniCount", { n: members.filter((member) => member.batch === year).length })}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="empty tight">
             <h2>{t("noBatches")}</h2>
@@ -442,27 +458,58 @@ function JoinLink({ inst, onChange }) {
   );
 }
 
-function Members({ inst, members, setTab, onRemove }) {
+function roleLine(member, t) {
+  return member.currentJob?.designation
+    || member.occupation
+    || member.qualification
+    || t("alumni");
+}
+
+function placeLine(member, t) {
+  return member.currentJob?.orgName
+    || member.businesses?.[0]?.name
+    || member.city
+    || t("cityNotSet");
+}
+
+function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [pinned, setPinned] = useState(focusYear);
   const [open, setOpen] = useState(null);
   const list = members || [];
 
-  const shown = useMemo(() => {
-    const needle = query.toLowerCase();
-    return list.filter((member) =>
-      (filter === "all" || member.batch === Number(filter)) &&
-      (!needle || [
-        member.memberNo, member.name, member.email, member.mobile, member.city, member.occupation,
-        member.currentJob?.orgName, member.previousJob?.orgName, member.spouseName,
-        ...(member.businesses || []).map((item) => item.name),
-      ].join(" ").toLowerCase().includes(needle))
-    );
-  }, [list, query, filter]);
+  const catalog = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const matches = (member) => !needle || [
+      member.memberNo, member.name, member.email, member.mobile, member.city, member.occupation,
+      member.qualification, member.currentJob?.orgName, member.currentJob?.designation,
+      member.previousJob?.orgName, member.spouseName,
+      ...(member.businesses || []).map((item) => item.name),
+    ].join(" ").toLowerCase().includes(needle);
+    const years = [...new Set([...(inst.batches || []), ...list.map((member) => member.batch)])]
+      .filter((year) => year !== "" && year != null)
+      .sort((a, b) => b - a);
+    return years
+      .map((year) => ({
+        year,
+        group: list.filter((member) => member.batch === year && matches(member)).sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .filter((item) => !needle || item.group.length);
+  }, [inst.batches, list, query]);
 
-  const years = [...new Set(shown.map((member) => member.batch))].sort((a, b) => b - a);
+  useEffect(() => {
+    if (focusYear == null || !members) return;
+    setPinned(focusYear);
+    document.getElementById(`batch-${focusYear}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusYear, members]);
+
+  const jump = (year) => {
+    setPinned(year);
+    document.getElementById(`batch-${year}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const openMember = list.find((member) => member.id === open);
 
   const remove = async () => {
@@ -492,14 +539,30 @@ function Members({ inst, members, setTab, onRemove }) {
         </div>
         <button className="btn ghost" disabled={!list.length} onClick={exportFile}>{t("exportCsv")}</button>
       </header>
-      <div className="toolbar">
-        <input placeholder={t("searchPh")} aria-label={t("searchAlumni")} value={query} onChange={(event) => setQuery(event.target.value)} />
-        <select aria-label={t("filterBatch")} value={filter} onChange={(event) => setFilter(event.target.value)}>
-          <option value="all">{t("allBatches")}</option>
-          {[...inst.batches].sort((a, b) => b - a).map((year) => <option key={year} value={year}>{t("batchTag", { year })}</option>)}
-        </select>
+      <div className="directory-bar">
+        <div className="toolbar">
+          <input placeholder={t("searchPh")} aria-label={t("searchAlumni")} value={query} onChange={(event) => setQuery(event.target.value)} />
+        </div>
+        {!!members && !!catalog.length && (
+          <div className="year-rail" aria-label={t("batches")}>
+            {catalog.map(({ year, group }) => (
+              <button
+                type="button"
+                key={year}
+                id={`jump-${year}`}
+                className={`year-chip ${pinned === year ? "on" : ""}`}
+                aria-current={pinned === year ? "true" : undefined}
+                aria-label={t("jumpToBatch", { year })}
+                onClick={() => jump(year)}
+              >
+                <b>{year}</b>
+                <small>{group.length}</small>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      {!members ? <div className="card empty"><p>{t("loadingAlumni")}</p></div> : !list.length ? (
+      {!members ? <div className="card empty"><p>{t("loadingAlumni")}</p></div> : !inst.batches.length && !list.length ? (
         <div className="card empty">
           <h2>{t("nobodyJoined")}</h2>
           <p>{t("shareSoRegister")}</p>
@@ -507,62 +570,140 @@ function Members({ inst, members, setTab, onRemove }) {
             <button className="btn" onClick={() => setTab("link")}>{t("getJoinLink")}</button>
           </div>
         </div>
-      ) : !shown.length ? (
+      ) : !catalog.length ? (
         <div className="card empty"><h2>{t("noMatches")}</h2><p>{t("tryDifferent")}</p></div>
-      ) : years.map((year) => {
-        const group = shown.filter((member) => member.batch === year).sort((a, b) => a.name.localeCompare(b.name));
-        return (
-          <section className="batch-group" key={year}>
-            <div className="bg-head"><h2>{t("batchTag", { year })}</h2><span>{group.length} {group.length === 1 ? t("oneMember") : t("manyMembers")}</span></div>
-            <div className="tablewrap only-desktop">
-              <table>
-                <thead>
-                  <tr><th>{t("name")}</th><th>{t("contact")}</th><th>{t("city")}</th><th>{t("work")}</th><th>{t("joined")}</th><th></th></tr>
-                </thead>
-                <tbody>
+      ) : (
+        <>
+          {!list.length && (
+            <div className="card empty tight year-empty-note">
+              <h2>{t("nobodyJoined")}</h2>
+              <p>{t("shareSoRegister")}</p>
+              <div className="share center">
+                <button className="btn" onClick={() => setTab("link")}>{t("getJoinLink")}</button>
+              </div>
+            </div>
+          )}
+          {catalog.map(({ year, group }) => (
+            <section className={`yearbook ${pinned === year ? "focus" : ""}`} id={`batch-${year}`} key={year}>
+              <header className="yearbook-head">
+                <div>
+                  <p className="eyebrow light">{t("batch")}</p>
+                  <h2>{year}</h2>
+                </div>
+                <span className="year-count">{t("alumniCount", { n: group.length })}</span>
+              </header>
+              {group.length ? (
+                <div className="roster">
                   {group.map((member) => (
-                    <tr key={member.id}>
-                      <td>
-                        <div className="who">
-                          <Avatar name={member.name} photo={member.photo} />
-                          <div><b>{member.name}</b><small>{member.memberNo || member.occupation || member.qualification}</small></div>
-                        </div>
-                      </td>
-                      <td>{member.mobile}<small>{member.email}</small></td>
-                      <td>{member.city || "—"}</td>
-                      <td>{member.currentJob?.orgName || member.businesses?.[0]?.name ? <span className="tag">{member.currentJob?.orgName || member.businesses[0].name}</span> : (member.occupation || "—")}</td>
-                      <td><small>{formatDate(lang, member.joinedAt)}</small></td>
-                      <td><button className="btn ghost sm" onClick={() => setOpen(member.id)}>{t("view")}</button></td>
-                    </tr>
+                    <button type="button" className="alum" key={member.id} onClick={() => setOpen(member.id)}>
+                      <Avatar name={member.name} photo={member.photo} />
+                      <div className="alum-main">
+                        <b>{member.name}</b>
+                        <small>{roleLine(member, t)}{member.identityRequest ? ` · ${t("updateRequested")}` : ""}</small>
+                        {member.memberNo && <span className="alum-no">{member.memberNo}</span>}
+                      </div>
+                      <div className="alum-side">
+                        <span>{placeLine(member, t)}</span>
+                        <small>{member.mobile || formatDate(lang, member.joinedAt)}</small>
+                      </div>
+                      <Icon name="chevron" size={18} />
+                    </button>
                   ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="person-list only-mobile">
-              {group.map((member) => (
-                <button type="button" className="person" key={member.id} onClick={() => setOpen(member.id)}>
-                  <div className="who">
-                    <Avatar name={member.name} photo={member.photo} />
-                    <div>
-                      <b>{member.name}</b>
-                      <small>{member.city || t("cityNotSet")} · {member.occupation || member.businesses?.[0]?.name || t("alumni")}</small>
-                    </div>
-                  </div>
-                  <Icon name="chevron" size={18} />
-                </button>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+                </div>
+              ) : (
+                <p className="year-empty">{t("emptyBatch")}</p>
+              )}
+            </section>
+          ))}
+        </>
+      )}
       {openMember && (
         <Drawer title={openMember.name} onClose={() => setOpen(null)}>
           <MemberProfile member={openMember} />
+          <IdentityEditor member={openMember} onSaved={onUpdate} />
           <div className="d-sec">
             <button className="btn danger sm" onClick={remove}>{t("removeFromList")}</button>
           </div>
         </Drawer>
       )}
     </>
+  );
+}
+
+function IdentityEditor({ member, onSaved }) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const pending = member.identityRequest;
+  const [name, setName] = useState(member.name || "");
+  const [email, setEmail] = useState(member.email || "");
+  const [mobile, setMobile] = useState(member.mobile || "");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setName(member.name || "");
+    setEmail(member.email || "");
+    setMobile(member.mobile || "");
+    setErr("");
+  }, [member.id, member.name, member.email, member.mobile]);
+
+  const save = async (event) => {
+    event.preventDefault();
+    if (!name.trim()) return setErr(t("enterName"));
+    if (!isEmail(email)) return setErr(t("badEmail"));
+    if (!isMobile(mobile)) return setErr(t("badMobile"));
+    setBusy(true);
+    setErr("");
+    try {
+      const data = await api(`/api/members/${member.id}`, {
+        method: "PATCH",
+        body: { name: name.trim(), email: email.trim(), mobile },
+      });
+      onSaved(data.member);
+      toast(t("identitySaved"));
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decide = async (action) => {
+    setBusy(true);
+    setErr("");
+    try {
+      const data = await api(`/api/members/${member.id}`, { method: "PATCH", body: { action } });
+      onSaved(data.member);
+      toast(t(action === "approve" ? "identityApproved" : "identityRejected"));
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="d-sec" onSubmit={save} noValidate>
+      <h3>{t("adminEditIdentity")}</h3>
+      <p className="sub">{t("adminEditIdentityHint")}</p>
+      {pending && (
+        <div className="note">
+          {t("identityPending")}: {pending.name} · {pending.email} · {pending.mobile}
+        </div>
+      )}
+      <ErrBox msg={err} />
+      <Field label={t("fullName")}><input value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label={t("emailId")}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+      <Field label={t("mobileNumber")}><input inputMode="tel" value={mobile} onChange={(event) => setMobile(event.target.value)} /></Field>
+      <div className="wizard-actions">
+        {pending && (
+          <>
+            <button type="button" className="btn ghost" disabled={busy} onClick={() => decide("reject")}>{t("rejectUpdate")}</button>
+            <button type="button" className="btn" disabled={busy} onClick={() => decide("approve")}>{t("approveUpdate")}</button>
+          </>
+        )}
+        <button className="btn brass" disabled={busy}>{busy ? t("saving") : t("saveIdentity")}</button>
+      </div>
+    </form>
   );
 }

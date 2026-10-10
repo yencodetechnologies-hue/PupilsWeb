@@ -375,6 +375,21 @@ app.get("/api/members", admin, wrap(async (req, res) => {
   res.json({ members: await membersFor(req.inst.id) });
 }));
 
+app.patch("/api/members/:id", admin, wrap(async (req, res) => {
+  const row = await getMemberById(req.params.id);
+  if (!row || row.instId !== req.inst.id) throw new HttpError(404, "That alumni record was not found.");
+  const action = req.body?.action;
+  if (action === "reject") {
+    await updateMemberProfile(row.id, { identityRequest: null });
+    return res.json({ member: publicMember(await getMemberById(row.id)) });
+  }
+  const source = action === "approve" ? row.identityRequest : req.body;
+  if (action === "approve" && !source?.name) throw new HttpError(400, "There is no update waiting for approval.");
+  const next = await identityFields(source || {}, row.id);
+  await updateMemberProfile(row.id, { ...next, identityRequest: null });
+  res.json({ member: publicMember(await getMemberById(row.id)) });
+}));
+
 app.delete("/api/members/:id", admin, wrap(async (req, res) => {
   const row = await getMemberById(req.params.id);
   if (!row || row.instId !== req.inst.id) return res.status(404).json({ error: "That alumni record was not found." });
@@ -554,23 +569,6 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
   const fields = {};
   const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
 
-  if (has("name")) {
-    const name = text(body.name, 80);
-    if (!name) throw new HttpError(400, "Enter your full name.");
-    fields.name = name;
-  }
-  if (has("email")) {
-    const email = text(body.email, 160).toLowerCase();
-    if (!isEmail(email)) throw new HttpError(400, "Enter a valid email ID.");
-    if (await emailTaken(email, req.member.id)) throw new HttpError(400, "This email is already registered.");
-    fields.email = email;
-  }
-  if (has("mobile")) {
-    const mobile = normMobile(body.mobile);
-    if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
-    if (await mobileTaken(mobile, req.member.id)) throw new HttpError(400, "This mobile number is already registered.");
-    fields.mobile = mobile;
-  }
   if (has("batch")) {
     const inst = await getInstById(req.member.instId);
     const batch = Number(body.batch);
@@ -617,6 +615,34 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
   await updateMemberProfile(req.member.id, fields);
   if (nextHash) await savePassword("member", req.member.id, nextHash);
   if (replacedId) await removePhoto(replacedId);
+  res.json({ member: publicMember(await getMemberById(req.member.id)) });
+}));
+
+async function identityFields(body, exceptId) {
+  const name = text(body.name, 80);
+  const email = text(body.email, 160).toLowerCase();
+  const mobile = normMobile(body.mobile);
+  if (!name) throw new HttpError(400, "Enter your full name.");
+  if (!isEmail(email)) throw new HttpError(400, "Enter a valid email ID.");
+  if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
+  if (await emailTaken(email, exceptId)) throw new HttpError(400, "This email is already registered.");
+  if (await mobileTaken(mobile, exceptId)) throw new HttpError(400, "This mobile number is already registered.");
+  return { name, email, mobile };
+}
+
+app.post("/api/me/identity-request", memberOnly, wrap(async (req, res) => {
+  const next = await identityFields(req.body || {}, req.member.id);
+  if (next.name === req.member.name && next.email === req.member.email && next.mobile === req.member.mobile) {
+    throw new HttpError(400, "Those details already match your account.");
+  }
+  await updateMemberProfile(req.member.id, {
+    identityRequest: { ...next, requestedAt: Date.now() },
+  });
+  res.json({ member: publicMember(await getMemberById(req.member.id)) });
+}));
+
+app.delete("/api/me/identity-request", memberOnly, wrap(async (req, res) => {
+  await updateMemberProfile(req.member.id, { identityRequest: null });
   res.json({ member: publicMember(await getMemberById(req.member.id)) });
 }));
 

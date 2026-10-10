@@ -131,6 +131,17 @@ export function publicMember(row) {
     kids: Array.isArray(row.kids) ? row.kids : [],
     photo: row.photo || "",
     joinedAt: Number(row.joinedAt),
+    identityRequest: identityRequestOf(row.identityRequest),
+  };
+}
+
+function identityRequestOf(value) {
+  if (!value || typeof value !== "object" || !value.name) return null;
+  return {
+    name: value.name,
+    email: value.email || "",
+    mobile: value.mobile || "",
+    requestedAt: Number(value.requestedAt) || 0,
   };
 }
 

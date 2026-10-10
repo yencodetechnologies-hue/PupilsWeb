@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, uploadPhoto } from "../api";
-import { Avatar, Brand, ErrBox, MemberProfile, PasswordField, PhotoPicker } from "../components";
+import { Avatar, Brand, ErrBox, Field, MemberProfile, PasswordField, PhotoPicker } from "../components";
 import { LangToggle, useI18n } from "../i18n";
 import { AddressFields, FamilyFields, MembershipFields, WorkFields } from "../memberForm";
 import { formFromMember } from "../memberShape";
@@ -66,7 +66,10 @@ export function MemberHome() {
           {showWizard ? (
             <EditProfile member={member} code={inst?.code} onSaved={(next) => { updateMember(next); setEditing(false); toast(t("profileSaved")); }} />
           ) : (
-            <MemberProfile member={member} />
+            <>
+              <MemberProfile member={member} />
+              <IdentityRequest member={member} />
+            </>
           )}
           <div className="d-sec">
             <h3>{t("account")}</h3>
@@ -91,6 +94,81 @@ export function MemberHome() {
           )}
         </section>
         <button className="btn ghost" onClick={logout}>{t("signOut")}</button>
+      </div>
+    </div>
+  );
+}
+
+function IdentityRequest({ member }) {
+  const { t } = useI18n();
+  const { updateMember } = useAuth();
+  const toast = useToast();
+  const pending = member.identityRequest;
+  const [form, setForm] = useState({
+    name: pending?.name || member.name || "",
+    email: pending?.email || member.email || "",
+    mobile: pending?.mobile || member.mobile || "",
+  });
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  const send = async () => {
+    if (!form.name.trim()) return setErr(t("enterName"));
+    if (!isEmail(form.email)) return setErr(t("badEmail"));
+    if (!isMobile(form.mobile)) return setErr(t("badMobile"));
+    if (form.name.trim() === member.name && form.email.trim().toLowerCase() === member.email && form.mobile.replace(/\D/g, "").slice(-10) === member.mobile) {
+      return setErr(t("nothingToChange"));
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      const data = await api("/api/me/identity-request", {
+        method: "POST",
+        body: { name: form.name.trim(), email: form.email.trim(), mobile: form.mobile },
+      });
+      updateMember(data.member);
+      toast(t("identitySent"));
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancel = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const data = await api("/api/me/identity-request", { method: "DELETE" });
+      updateMember(data.member);
+      setForm({ name: data.member.name, email: data.member.email, mobile: data.member.mobile });
+      toast(t("identityCancelled"));
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="profile-block" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}>
+      <h3>{t("requestIdentity")}</h3>
+      <p className="sub">{t("requestIdentityHint")}</p>
+      {pending && <div className="note">{t("identityPending")}</div>}
+      <ErrBox msg={err} />
+      <Field label={t("fullName")}>
+        <input value={form.name} onChange={set("name")} />
+      </Field>
+      <Field label={t("emailId")}>
+        <input type="email" value={form.email} onChange={set("email")} />
+      </Field>
+      <Field label={t("mobileNumber")}>
+        <input inputMode="tel" value={form.mobile} onChange={set("mobile")} />
+      </Field>
+      <div className="wizard-actions">
+        {pending && <button type="button" className="btn ghost" disabled={busy} onClick={cancel}>{t("cancelRequest")}</button>}
+        <button type="button" className="btn brass" disabled={busy} onClick={send}>{busy ? t("sending") : t("sendForApproval")}</button>
       </div>
     </div>
   );
@@ -256,7 +334,8 @@ function EditProfile({ member, code, onSaved }) {
             }}
             onClear={clearPhoto}
           />
-          <MembershipFields form={form} setForm={setForm} batches={batches} />
+          <MembershipFields form={form} setForm={setForm} batches={batches} lockIdentity />
+          <IdentityRequest member={member} />
         </>
       )}
       {step === 2 && <AddressFields form={form} setForm={setForm} />}

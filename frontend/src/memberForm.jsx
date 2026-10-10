@@ -32,7 +32,7 @@ function binders(setForm) {
   return { set, setNest, setRow };
 }
 
-export function MembershipFields({ form, setForm, batches, password }) {
+export function MembershipFields({ form, setForm, batches, password, lockIdentity }) {
   const { t } = useI18n();
   const { set } = binders(setForm);
   const years = [...(batches || [])];
@@ -59,8 +59,9 @@ export function MembershipFields({ form, setForm, batches, password }) {
           <input value={form.classLeaving} onChange={set("classLeaving")} />
         </Field>
       </div>
+      {lockIdentity && <p className="sub">{t("identityLocked")}</p>}
       <Field label={t("fullName")}>
-        <input autoComplete="name" value={form.name} onChange={set("name")} />
+        <input autoComplete="name" value={form.name} onChange={set("name")} readOnly={lockIdentity} disabled={lockIdentity} />
       </Field>
       <div className="row3">
         <Field label={t("age")}>
@@ -80,7 +81,7 @@ export function MembershipFields({ form, setForm, batches, password }) {
       </div>
       <div className="row">
         <Field label={t("mobileNumber")}>
-          <input inputMode="tel" autoComplete="tel" placeholder="9876543210" value={form.mobile} onChange={set("mobile")} />
+          <input inputMode="tel" autoComplete="tel" placeholder="9876543210" value={form.mobile} onChange={set("mobile")} readOnly={lockIdentity} disabled={lockIdentity} />
         </Field>
         <Field label={t("bloodGroup")}>
           <select value={form.blood} onChange={set("blood")}>
@@ -90,7 +91,7 @@ export function MembershipFields({ form, setForm, batches, password }) {
         </Field>
       </div>
       <Field label={t("emailId")}>
-        <input type="email" autoComplete="email" value={form.email} onChange={set("email")} />
+        <input type="email" autoComplete="email" value={form.email} onChange={set("email")} readOnly={lockIdentity} disabled={lockIdentity} />
       </Field>
       {password}
     </section>
