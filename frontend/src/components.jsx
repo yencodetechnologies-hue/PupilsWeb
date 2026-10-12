@@ -19,6 +19,9 @@ const ICONS = {
   chevron: "M9 6l6 6-6 6",
   close: "M6 6l12 12M18 6L6 18",
   alert: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v5M12 16.5h.01",
+  search: "M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM21 21l-4.3-4.3",
+  calendar: "M4 5h16v15H4zM4 10h16M8 3v4M16 3v4",
+  pin: "M12 21s-6.5-5.2-6.5-10.2a6.5 6.5 0 1 1 13 0C18.5 15.8 12 21 12 21zM12 13.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z",
 };
 
 export function Icon({ name, size = 20 }) {

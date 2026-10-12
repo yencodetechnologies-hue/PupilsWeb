@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, downloadCsv } from "../api";
 import { joinUrl } from "../site";
 import { Avatar, Brand, Drawer, ErrBox, Field, Icon, MemberProfile, PasswordField } from "../components";
-import { formatDate, LangToggle, typeLabel, useI18n } from "../i18n";
+import { LangToggle, typeLabel, useI18n } from "../i18n";
 import { useAuth, useToast } from "../state";
 
 const TABS = [
@@ -172,16 +172,18 @@ function AccountProfile({ inst, onChange }) {
           <p>{t("profileHint")}</p>
         </div>
       </header>
-      <form className="card profile-form" onSubmit={save} noValidate>
-        <ErrBox msg={err} />
-        <h2>{t("yourDetails")}</h2>
-        <Field label={t("yourName")}><input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></Field>
-        <div className="row">
-          <Field label={t("emailId")}><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
-          <Field label={t("mobileNumber")}><input inputMode="tel" autoComplete="tel" value={mobile} onChange={(event) => setMobile(event.target.value)} /></Field>
-        </div>
-        <div className="profile-block">
-          <h3>{t("institution")}</h3>
+      <form className="stack profile-form" onSubmit={save} noValidate>
+        <section className="card">
+          <h2>{t("yourDetails")}</h2>
+          <ErrBox msg={err} />
+          <Field label={t("yourName")}><input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+          <div className="row">
+            <Field label={t("emailId")}><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+            <Field label={t("mobileNumber")}><input inputMode="tel" autoComplete="tel" value={mobile} onChange={(event) => setMobile(event.target.value)} /></Field>
+          </div>
+        </section>
+        <section className="card">
+          <h2>{t("institution")}</h2>
           <div className="seg" role="group" aria-label={t("institutionType")}>
             {[["School", "typeSchool"], ["College", "typeCollege"], ["Other", "typeOther"]].map(([value, key]) => (
               <button key={value} type="button" className={type === value ? "on" : ""} onClick={() => setType(value)}>{t(key)}</button>
@@ -190,19 +192,19 @@ function AccountProfile({ inst, onChange }) {
           <Field label={type === "Other" ? t("orgName") : t("namedType", { type: t(type === "School" ? "typeSchool" : "typeCollege") })}>
             <input value={instName} onChange={(event) => setInstName(event.target.value)} />
           </Field>
-        </div>
-        <div className="profile-block">
-          <h3>{t("changePassword")}</h3>
+        </section>
+        <section className="card">
+          <h2>{t("changePassword")}</h2>
           <p className="sub">{t("passwordOptional")}</p>
           <PasswordField label={t("currentPassword")} autoComplete="current-password" placeholder={t("currentPassword")} value={currentPw} onChange={(event) => setCurrentPw(event.target.value)} />
           <div className="row">
             <PasswordField label={t("newPassword")} autoComplete="new-password" value={pw} onChange={(event) => setPw(event.target.value)} />
             <PasswordField label={t("confirmNewPassword")} autoComplete="new-password" value={pw2} onChange={(event) => setPw2(event.target.value)} />
           </div>
-        </div>
-        <div className="profile-save">
-          <button className="btn brass" disabled={busy}>{busy ? t("saving") : t("saveProfile")}</button>
-        </div>
+          <div className="profile-save">
+            <button className="btn brass" disabled={busy}>{busy ? t("saving") : t("saveProfile")}</button>
+          </div>
+        </section>
       </form>
     </>
   );
@@ -245,10 +247,26 @@ function Overview({ inst, members, setTab }) {
         <button className="btn brass" onClick={() => setTab("link")}>{t("shareJoinLink")}</button>
       </header>
       <div className="stats">
-        <article className="stat"><b>{members ? list.length : "–"}</b><span>{t("alumniJoined")}</span></article>
-        <article className="stat"><b>{inst.batches.length}</b><span>{t("batches")}</span></article>
-        <article className="stat"><b>{members ? list.filter((member) => member.joinedAt > week).length : "–"}</b><span>{t("joinedThisWeek")}</span></article>
-        <article className="stat"><b>{members ? businesses : "–"}</b><span>{t("businessesCities", { n: cities })}</span></article>
+        <article className="stat">
+          <span className="stat-icon"><Icon name="members" /></span>
+          <b>{members ? list.length : "–"}</b>
+          <span>{t("alumniJoined")}</span>
+        </article>
+        <article className="stat">
+          <span className="stat-icon"><Icon name="batches" /></span>
+          <b>{inst.batches.length}</b>
+          <span>{t("batches")}</span>
+        </article>
+        <article className="stat">
+          <span className="stat-icon"><Icon name="calendar" /></span>
+          <b>{members ? list.filter((member) => member.joinedAt > week).length : "–"}</b>
+          <span>{t("joinedThisWeek")}</span>
+        </article>
+        <article className="stat">
+          <span className="stat-icon"><Icon name="pin" /></span>
+          <b>{members ? businesses : "–"}</b>
+          <span>{t("businessesCities", { n: cities })}</span>
+        </article>
       </div>
       {members && list.length === 0 ? (
         <div className="card empty">
@@ -272,7 +290,7 @@ function Overview({ inst, members, setTab }) {
                   </div>
                 ))}
               </div>
-            ) : <p className="muted">{t("addBatchChart")}</p>}
+            ) : <p className="chart-empty">{t("addBatchChart")}</p>}
           </section>
           <section className="card">
             <h2>{t("recentlyJoined")}</h2>
@@ -355,8 +373,8 @@ function Batches({ inst, members, onChange, onOpen }) {
           <p>{t("eachYear")}</p>
         </div>
       </header>
-      <section className="card">
-        <div className="split-form">
+      <div className="grid2 form-grid">
+        <section className="card">
           <form onSubmit={addOne} noValidate>
             <h2>{t("oneYear")}</h2>
             <Field label={t("batchYear")}>
@@ -364,6 +382,8 @@ function Batches({ inst, members, onChange, onOpen }) {
             </Field>
             <button className="btn" disabled={busy}>{t("addBatch")}</button>
           </form>
+        </section>
+        <section className="card">
           <form onSubmit={addRange} noValidate>
             <h2>{t("rangeYears")}</h2>
             <div className="row">
@@ -372,6 +392,12 @@ function Batches({ inst, members, onChange, onOpen }) {
             </div>
             <button className="btn ghost" disabled={busy}>{t("addRange")}</button>
           </form>
+        </section>
+      </div>
+      <section className="card batch-shelf">
+        <div className="shelf-head">
+          <h2>{t("batches")}</h2>
+          <span className="count-pill">{years.length}</span>
         </div>
         {years.length ? (
           <>
@@ -437,14 +463,15 @@ function JoinLink({ inst, onChange }) {
       </header>
       <section className="card">
         {!inst.batches.length && <ErrBox msg={t("needBatch")} />}
-        <div className="linkbox">
+        <div className="link-feature">
+          <p className="eyebrow light">{t("joinLink")}</p>
           <code>{url}</code>
-          <button className="btn sm" onClick={copy}>{t("copyLink")}</button>
+          <button className="btn brass" onClick={copy}>{t("copyLink")}</button>
         </div>
         <div className="share">
           <a className="btn ghost sm" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${message}`}>{t("whatsapp")}</a>
           <a className="btn ghost sm" href={`mailto:?subject=${encodeURIComponent(t("alumniSubject", { name: inst.name }))}&body=${message}`}>{t("email")}</a>
-          <button className="btn brass sm" onClick={() => navigate(`/join/${inst.code}?preview=1`)}>{t("openJoinForm")}</button>
+          <button className="btn ghost sm" onClick={() => navigate(`/join/${inst.code}?preview=1`)}>{t("openJoinForm")}</button>
           <button className="btn ghost sm" onClick={renew}>{t("newLink")}</button>
         </div>
         <p className="sub tight">
@@ -473,7 +500,7 @@ function placeLine(member, t) {
 }
 
 function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [pinned, setPinned] = useState(focusYear);
@@ -498,6 +525,8 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
       }))
       .filter((item) => !needle || item.group.length);
   }, [inst.batches, list, query]);
+
+  const matchCount = catalog.reduce((sum, item) => sum + item.group.length, 0);
 
   useEffect(() => {
     if (focusYear == null || !members) return;
@@ -540,8 +569,12 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
         <button className="btn ghost" disabled={!list.length} onClick={exportFile}>{t("exportCsv")}</button>
       </header>
       <div className="directory-bar">
-        <div className="toolbar">
-          <input placeholder={t("searchPh")} aria-label={t("searchAlumni")} value={query} onChange={(event) => setQuery(event.target.value)} />
+        <div className="search-row">
+          <label className="search-field">
+            <Icon name="search" size={18} />
+            <input placeholder={t("searchPh")} aria-label={t("searchAlumni")} value={query} onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          {!!members && <span className="match-line">{t("alumniCount", { n: matchCount })}</span>}
         </div>
         {!!members && !!catalog.length && (
           <div className="year-rail" aria-label={t("batches")}>
@@ -584,29 +617,27 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
             </div>
           )}
           {catalog.map(({ year, group }) => (
-            <section className={`yearbook ${pinned === year ? "focus" : ""}`} id={`batch-${year}`} key={year}>
-              <header className="yearbook-head">
+            <section className={`batch-group ${pinned === year ? "focus" : ""}`} id={`batch-${year}`} key={year}>
+              <header className="batch-head">
                 <div>
-                  <p className="eyebrow light">{t("batch")}</p>
+                  <p className="eyebrow">{t("batch")}</p>
                   <h2>{year}</h2>
                 </div>
-                <span className="year-count">{t("alumniCount", { n: group.length })}</span>
+                <span className="year-count ink">{t("alumniCount", { n: group.length })}</span>
               </header>
               {group.length ? (
-                <div className="roster">
+                <div className="alum-grid">
                   {group.map((member) => (
-                    <button type="button" className="alum" key={member.id} onClick={() => setOpen(member.id)}>
+                    <button type="button" className="alum-card" key={member.id} onClick={() => setOpen(member.id)}>
                       <Avatar name={member.name} photo={member.photo} />
-                      <div className="alum-main">
+                      <span className="alum-copy">
                         <b>{member.name}</b>
-                        <small>{roleLine(member, t)}{member.identityRequest ? ` · ${t("updateRequested")}` : ""}</small>
+                        <small>{roleLine(member, t)}</small>
+                        <span className="alum-place">{placeLine(member, t)}</span>
+                        {member.mobile && <small className="alum-phone">{member.mobile}</small>}
                         {member.memberNo && <span className="alum-no">{member.memberNo}</span>}
-                      </div>
-                      <div className="alum-side">
-                        <span>{placeLine(member, t)}</span>
-                        <small>{member.mobile || formatDate(lang, member.joinedAt)}</small>
-                      </div>
-                      <Icon name="chevron" size={18} />
+                        {member.identityRequest && <span className="pending-badge">{t("updateRequested")}</span>}
+                      </span>
                     </button>
                   ))}
                 </div>
