@@ -49,7 +49,6 @@ export function MembershipFields({ form, setForm, batches, password, lockIdentit
   const { t } = useI18n();
   const { set } = binders(setForm);
   const years = [...(batches || [])];
-  const known = years.map(Number);
   return (
     <section>
       <h2>{t("membershipTitle")}</h2>
@@ -59,11 +58,7 @@ export function MembershipFields({ form, setForm, batches, password, lockIdentit
       </Field>
       <div className="row3">
         <Field label={t("yearJoined")}>
-          <select value={form.batch} onChange={set("batch")}>
-            <option value="">{t("selectYourBatch")}</option>
-            {form.batch && !known.includes(Number(form.batch)) && <option value={form.batch}>{t("batchTag", { year: form.batch })}</option>}
-            {[...years].sort((a, b) => b - a).map((year) => <option key={year} value={year}>{t("batchTag", { year })}</option>)}
-          </select>
+          <input inputMode="numeric" placeholder="2001" value={form.batch} onChange={set("batch")} />
         </Field>
         <Field label={t("yearCompleted")}>
           <BatchYearSelect value={form.yearCompleted} years={years} onChange={set("yearCompleted")} />

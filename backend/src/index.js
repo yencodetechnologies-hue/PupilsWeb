@@ -537,7 +537,7 @@ app.post("/api/join/:code", wrap(async (req, res) => {
   let memberNo = await nextMemberNo(inst.id);
   while (await memberNoTaken(inst.id, memberNo)) memberNo = String(Number(memberNo) + 1);
 
-  if (!pub.batches.includes(batch)) throw new HttpError(400, "Select your batch.");
+  if (!validYear(batch)) throw new HttpError(400, "Enter a 4-digit year, like 2001.");
   if (!name) throw new HttpError(400, "Enter your full name.");
   if (!isEmail(email)) throw new HttpError(400, "Enter a valid email ID.");
   if (!isMobile(mobile)) throw new HttpError(400, "Enter a valid 10-digit mobile number.");
@@ -580,10 +580,8 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
   const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
 
   if (has("batch")) {
-    const inst = await getInstById(req.member.instId);
     const batch = Number(body.batch);
-    const years = publicInst(inst)?.batches || [];
-    if (!years.includes(batch)) throw new HttpError(400, "Select your batch.");
+    if (!validYear(batch)) throw new HttpError(400, "Enter a 4-digit year, like 2001.");
     fields.batch = batch;
   }
   if (!req.member.memberNo) fields.memberNo = await nextMemberNo(req.member.instId);
@@ -650,14 +648,6 @@ app.post("/api/me/identity-request", memberOnly, wrap(async (req, res) => {
 app.delete("/api/me/identity-request", memberOnly, wrap(async (req, res) => {
   await updateMemberProfile(req.member.id, { identityRequest: null });
   res.json({ member: publicMember(await getMemberById(req.member.id)) });
-}));
-
-app.delete("/api/me", memberOnly, wrap(async (req, res) => {
-  const changes = await deleteMember(req.member.id, req.member.instId);
-  if (!changes) throw new HttpError(404, "That account was not found.");
-  await removePhoto(req.member.photoId);
-  res.clearCookie("ac_token", clearCookieOpts);
-  res.json({ ok: true });
 }));
 
 app.use((err, _req, res, _next) => {

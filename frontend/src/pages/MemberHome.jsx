@@ -17,7 +17,6 @@ export function MemberHome() {
   const unfinished = needsProfile(member);
   const [mates, setMates] = useState([]);
   const [editing, setEditing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const showWizard = unfinished || editing;
 
   useEffect(() => {
@@ -30,20 +29,6 @@ export function MemberHome() {
     await api("/api/auth/logout", { method: "POST" }).catch(() => {});
     setSession(null);
     navigate("/");
-  };
-
-  const removeAccount = async () => {
-    if (!window.confirm(t("deleteConfirm", { email: member.email }))) return;
-    setDeleting(true);
-    try {
-      await api("/api/me", { method: "DELETE" });
-      setSession(null);
-      toast(t("accountDeleted"));
-      navigate("/");
-    } catch (error) {
-      toast(error.message);
-      setDeleting(false);
-    }
   };
 
   return (
@@ -71,11 +56,6 @@ export function MemberHome() {
               <IdentityRequest member={member} />
             </>
           )}
-          <div className="d-sec">
-            <h3>{t("account")}</h3>
-            <p className="sub">{t("deleteHint")}</p>
-            <button className="btn danger" disabled={deleting} onClick={removeAccount}>{deleting ? t("deleting") : t("deleteAccount")}</button>
-          </div>
         </section>
         <section className="card">
           <h2>{t("yourBatchmates")}</h2>
@@ -176,6 +156,10 @@ function IdentityRequest({ member }) {
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const isMobile = (value) => /^[6-9]\d{9}$/.test(String(value).replace(/\D/g, "").slice(-10));
+const isJoinedYear = (value) => {
+  const year = Number(String(value).trim());
+  return /^\d{4}$/.test(String(value).trim()) && year >= 1950 && year <= new Date().getFullYear() + 1;
+};
 const STEPS = ["stepMembership", "stepAddress", "stepFamily", "stepWork"];
 
 function needsProfile(member) {
@@ -243,7 +227,7 @@ function EditProfile({ member, code, onSaved }) {
       if (!form.name.trim()) return t("enterName");
       if (!isEmail(form.email)) return t("badEmail");
       if (!isMobile(form.mobile)) return t("badMobile");
-      if (!form.batch) return t("selectBatch");
+      if (!isJoinedYear(form.batch)) return t("badYear");
     }
     if (step === 3 && (!form.father.trim() || !form.mother.trim())) return t("enterParents");
     return "";

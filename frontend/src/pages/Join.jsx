@@ -8,6 +8,10 @@ import { useAuth } from "../state";
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const isMobile = (value) => /^[6-9]\d{9}$/.test(String(value).replace(/\D/g, "").slice(-10));
+const isJoinedYear = (value) => {
+  const year = Number(String(value).trim());
+  return /^\d{4}$/.test(String(value).trim()) && year >= 1950 && year <= new Date().getFullYear() + 1;
+};
 
 export function Join() {
   const { t } = useI18n();
@@ -71,10 +75,6 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
   const [joined, setJoined] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", batch: "", yearCompleted: "", mobile: "", pw: "", pw2: "" });
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
-  const setYear = (event) => {
-    const year = event.target.value;
-    setForm((current) => ({ ...current, yearCompleted: year, batch: year }));
-  };
   const years = [...(inst.batches || [])].sort((a, b) => b - a);
 
   useEffect(() => {
@@ -85,6 +85,7 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
     event.preventDefault();
     if (!form.name.trim()) return setErr(t("enterName"));
     if (!isEmail(form.email)) return setErr(t("badEmail"));
+    if (!isJoinedYear(form.batch)) return setErr(t("badYear"));
     if (!form.yearCompleted) return setErr(t("selectYearCompleted"));
     if (!isMobile(form.mobile)) return setErr(t("badMobile"));
     if (form.pw.length < 6) return setErr(t("shortPassword"));
@@ -150,8 +151,11 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
         <Field label={t("memberNo")} hint={t("memberNoHint")}>
           <input value={nextMemberNo} readOnly disabled placeholder={t("memberNoAuto")} />
         </Field>
+        <Field label={t("yearJoined")}>
+          <input inputMode="numeric" placeholder="2001" value={form.batch} onChange={set("batch")} />
+        </Field>
         <Field label={t("yearCompleted")}>
-          <BatchYearSelect value={form.yearCompleted} years={years} onChange={setYear} />
+          <BatchYearSelect value={form.yearCompleted} years={years} onChange={set("yearCompleted")} />
         </Field>
         <Field label={t("fullName")}>
           <input autoComplete="name" placeholder={t("fullName")} value={form.name} onChange={set("name")} />
