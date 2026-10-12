@@ -70,6 +70,7 @@ export const cookieOpts = {
   httpOnly: true,
   sameSite: "none",
   secure: true,
+  partitioned: true,
   path: "/",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
@@ -78,6 +79,7 @@ export const clearCookieOpts = {
   httpOnly: true,
   sameSite: "none",
   secure: true,
+  partitioned: true,
   path: "/",
 };
 

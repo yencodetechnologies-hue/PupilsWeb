@@ -14,7 +14,10 @@ export default defineConfig({
             const cookies = proxyRes.headers["set-cookie"];
             if (!cookies) return;
             proxyRes.headers["set-cookie"] = cookies.map((cookie) =>
-              cookie.replace(/;\s*Secure/gi, "").replace(/;\s*SameSite=None/gi, "; SameSite=Lax")
+              cookie
+                .replace(/;\s*Secure/gi, "")
+                .replace(/;\s*Partitioned/gi, "")
+                .replace(/;\s*SameSite=None/gi, "; SameSite=Lax")
             );
           });
         },
