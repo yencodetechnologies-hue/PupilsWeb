@@ -34,7 +34,9 @@ import {
   markOtpVerified,
   deleteOtp,
   batchmates,
+  alumniSearch,
 } from "./db.js";
+import { applyVisibility, cleanVisibility } from "./visibility.js";
 import { sendOtp } from "./mail.js";
 import {
   BLOOD,
@@ -432,7 +434,7 @@ function profileDetails(body) {
     nativeAddr: addressLine(nativeAddress),
     city: text(curAddress.district, 80),
     siblings: cleanSiblings(body.siblings),
-    otherSchools: cleanList(body.otherSchools, ["name", "yearCompleted", "classLeaving"], 8),
+    otherSchools: cleanList(body.otherSchools, ["name", "yearCompleted", "classLeaving"], 12),
     currentJob,
     previousJob,
     collegeUg: cleanStudy(body.collegeUg),
@@ -443,12 +445,46 @@ function profileDetails(body) {
     spouseOccupation: text(body.spouseOccupation, 120),
     spouseCompany: text(body.spouseCompany, 160),
     kidsCount: cleanKidsCount(body.kidsCount),
-    kids: cleanList(body.kids, ["name", "dob", "school", "classYear"], 4),
+    kids: cleanList(body.kids, ["name", "dob", "school", "classYear"], 12),
   };
 }
 
+function assertProfile(details) {
+  const pin = (addr) => {
+    const code = addr?.pincode || "";
+    if (!code) return;
+    const india = !addr.country || addr.country === "India";
+    if (india && !/^\d{6}$/.test(code)) throw new HttpError(400, "Enter a 6-digit pincode.");
+  };
+  const day = (value) => {
+    if (!value) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new HttpError(400, "Enter a valid date of birth.");
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime()) || date > new Date()) throw new HttpError(400, "Enter a valid date of birth.");
+  };
+  const job = (value) => {
+    if (value?.email && !isEmail(value.email)) throw new HttpError(400, "Enter a valid email address.");
+    if (value?.phone && !isMobile(value.phone)) throw new HttpError(400, "Enter a valid 10-digit phone number.");
+  };
+  pin(details.curAddress);
+  pin(details.nativeAddress);
+  day(details.dob);
+  for (const item of details.siblings) day(item.dob);
+  for (const item of details.kids) day(item.dob);
+  job(details.currentJob);
+  job(details.previousJob);
+  const withSpouse = ["Married", "Widowed", "Divorced"].includes(details.maritalStatus);
+  if (!withSpouse) {
+    details.spouseName = "";
+    details.spouseOccupation = "";
+    details.spouseCompany = "";
+  }
+}
+
 function jobCell(job) {
-  return [job?.orgName, job?.designation, job?.orgType, job?.contact].filter(Boolean).join(" · ");
+  const parts = [job?.orgName, job?.designation, job?.orgType, job?.address, job?.phone, job?.email];
+  if (!job?.address && !job?.phone && !job?.email) parts.push(job?.contact);
+  return parts.filter(Boolean).join(" · ");
 }
 
 function studyCell(study) {
@@ -532,6 +568,7 @@ app.post("/api/join/:code", wrap(async (req, res) => {
   const mobile = normMobile(body.mobile);
   const password = assertPassword(body.pw);
   const details = profileDetails(body);
+  assertProfile(details);
   details.yearCompleted = completedYear(details.yearCompleted, pub.batches);
   const picture = body.photo || body.photoId ? acceptPhoto(body.photo, body.photoId) : { photo: "", photoId: "" };
   let memberNo = await nextMemberNo(inst.id);
@@ -570,8 +607,19 @@ app.post("/api/join/:code", wrap(async (req, res) => {
 const memberOnly = requireUser("member");
 
 app.get("/api/me/batchmates", memberOnly, wrap(async (req, res) => {
-  const mates = await batchmates(req.member.instId, req.member.batch, req.member.id);
-  res.json({ batchmates: mates });
+  const rows = await batchmates(req.member.instId, req.member.batch, req.member.id);
+  res.json({ batchmates: rows.map((row) => applyVisibility(publicMember(row), req.member)) });
+}));
+
+app.get("/api/me/alumni", memberOnly, wrap(async (req, res) => {
+  const rows = await alumniSearch(req.member.instId, req.member.id, text(req.query.q, 80));
+  res.json({ alumni: rows.map((row) => applyVisibility(publicMember(row), req.member)) });
+}));
+
+app.patch("/api/me/visibility", memberOnly, wrap(async (req, res) => {
+  const visibility = cleanVisibility(req.body?.visibility, req.member.visibility);
+  await updateMemberProfile(req.member.id, { visibility });
+  res.json({ member: publicMember(await getMemberById(req.member.id)) });
 }));
 
 app.patch("/api/me", memberOnly, wrap(async (req, res) => {
@@ -587,6 +635,7 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
   if (!req.member.memberNo) fields.memberNo = await nextMemberNo(req.member.instId);
   if (has("curAddress") || has("father") || has("currentJob") || has("siblings") || has("kids")) {
     const details = profileDetails(body);
+    assertProfile(details);
     const inst = await getInstById(req.member.instId);
     const years = publicInst(inst)?.batches || [];
     details.yearCompleted = completedYear(details.yearCompleted, years, req.member.yearCompleted);
@@ -607,17 +656,7 @@ app.patch("/api/me", memberOnly, wrap(async (req, res) => {
     if (req.member.photoId && req.member.photoId !== picture.photoId) replacedId = req.member.photoId;
   }
 
-  const nextPassword = String(body.pw ?? "");
-  let nextHash = "";
-  if (nextPassword) {
-    const current = String(body.currentPw ?? "");
-    const ok = await bcrypt.compare(current, req.member.passwordHash);
-    if (!ok) throw new HttpError(400, "Current password is incorrect.");
-    nextHash = await bcrypt.hash(assertPassword(nextPassword), 10);
-  }
-
   await updateMemberProfile(req.member.id, fields);
-  if (nextHash) await savePassword("member", req.member.id, nextHash);
   if (replacedId) await removePhoto(replacedId);
   res.json({ member: publicMember(await getMemberById(req.member.id)) });
 }));

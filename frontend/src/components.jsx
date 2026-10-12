@@ -243,13 +243,15 @@ function parentLine(name, occupation, company) {
 }
 
 function JobView({ job }) {
-  if (!job?.orgName && !job?.designation && !job?.orgType && !job?.contact) return null;
+  const address = job?.address || (!job?.phone && !job?.email ? job?.contact : "");
+  if (!job?.orgName && !job?.designation && !job?.orgType && !address && !job?.phone && !job?.email) return null;
   const meta = [job.orgName ? job.designation : "", job.orgType].filter(Boolean).join(" · ");
   return (
     <div className="mini">
       <b>{job.orgName || job.designation}</b>
       {meta && <small>{meta}</small>}
-      {job.contact && <p>{job.contact}</p>}
+      {address && <p>{address}</p>}
+      {(job.phone || job.email) && <small>{[job.phone, job.email].filter(Boolean).join(" · ")}</small>}
     </div>
   );
 }

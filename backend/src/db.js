@@ -1,5 +1,6 @@
 import "./env.js";
 import { MongoClient } from "mongodb";
+import { visibilityOf } from "./visibility.js";
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {
@@ -71,6 +72,9 @@ function jobOf(value) {
     orgName: source.orgName || "",
     designation: source.designation || "",
     orgType: source.orgType || "",
+    address: source.address || "",
+    phone: source.phone || "",
+    email: source.email || "",
     contact: source.contact || "",
   };
 }
@@ -132,6 +136,7 @@ export function publicMember(row) {
     photo: row.photo || "",
     joinedAt: Number(row.joinedAt),
     identityRequest: identityRequestOf(row.identityRequest),
+    visibility: visibilityOf(row),
   };
 }
 
@@ -334,11 +339,17 @@ export async function deleteOtp(email) {
 }
 
 export async function batchmates(instId, batch, exceptId) {
-  return members()
-    .find(
-      { instId, batch, id: { $ne: exceptId } },
-      { projection: { _id: 0, id: 1, name: 1, city: 1, occupation: 1, qualification: 1, photo: 1 } }
-    )
+  const rows = await members()
+    .find({ instId, batch: Number(batch), id: { $ne: exceptId } })
     .sort({ name: 1 })
     .toArray();
+  return rows.map(clean);
+}
+
+export async function alumniSearch(instId, exceptId, query) {
+  const q = String(query || "").trim();
+  const filter = { instId, id: { $ne: exceptId } };
+  if (q) filter.name = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+  const rows = await members().find(filter).sort({ name: 1 }).limit(50).toArray();
+  return rows.map(clean);
 }

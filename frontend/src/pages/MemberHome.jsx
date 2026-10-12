@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, uploadPhoto } from "../api";
-import { Avatar, Brand, ErrBox, Field, MemberProfile, PasswordField, PhotoPicker } from "../components";
+import { BI, VISIBILITY_GROUPS } from "../biLabels";
+import { Avatar, Brand, ErrBox, Field } from "../components";
 import { LangToggle, useI18n } from "../i18n";
-import { AddressFields, FamilyFields, MembershipFields, WorkFields } from "../memberForm";
-import { formFromMember } from "../memberShape";
+import { ProfileRecord, RegistrationSheet } from "../memberForm";
+import { formFromMember, formIssues, spouseRelevant, visibilityFrom } from "../memberShape";
 import { useAuth, useToast } from "../state";
 
 export function MemberHome() {
@@ -15,15 +16,9 @@ export function MemberHome() {
   const member = session.member;
   const inst = session.institution;
   const unfinished = needsProfile(member);
-  const [mates, setMates] = useState([]);
+  const [view, setView] = useState("profile");
   const [editing, setEditing] = useState(false);
-  const showWizard = unfinished || editing;
-
-  useEffect(() => {
-    api("/api/me/batchmates")
-      .then((data) => setMates(data.batchmates))
-      .catch(() => setMates([]));
-  }, [member.batch]);
+  const showForm = view === "profile" && (unfinished || editing);
 
   const logout = async () => {
     await api("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -31,51 +26,189 @@ export function MemberHome() {
     navigate("/");
   };
 
+  const printSheet = () => {
+    const previous = document.title;
+    document.title = `${member.name || "Alumni"} registration`;
+    window.print();
+    document.title = previous;
+  };
+
   return (
     <div className="join-wrap member-home">
-      <header className="join-hero">
+      <header className="join-hero no-print">
         <LangToggle />
         <Brand />
         <p className="eyebrow light">{member.name}</p>
         <h1>{inst?.name || t("yourInstitution")}</h1>
-        <p>{mates.length === 1 ? t("batchmateHere", { year: member.batch }) : t("batchmatesHere", { year: member.batch, n: mates.length })}</p>
+        <p>{t("batchTag", { year: member.batch })}</p>
       </header>
       <div className="join-body stack">
-        <section className="card profile-card">
-          <div className="sec-h">
-            <h2>{showWizard && unfinished ? t("completeProfile") : t("yourProfile")}</h2>
-            {!unfinished && (
-              <button className="btn ghost sm" onClick={() => setEditing((open) => !open)}>{editing ? t("close") : t("editProfile")}</button>
-            )}
-          </div>
-          {showWizard ? (
-            <EditProfile member={member} code={inst?.code} onSaved={(next) => { updateMember(next); setEditing(false); toast(t("profileSaved")); }} />
-          ) : (
-            <>
-              <MemberProfile member={member} />
-              <IdentityRequest member={member} />
-            </>
-          )}
-        </section>
-        <section className="card">
-          <h2>{t("yourBatchmates")}</h2>
-          {mates.length ? (
-            <div className="mate-grid">
-              {mates.map((mate) => (
-                <article className="mate" key={mate.id}>
-                  <Avatar name={mate.name} photo={mate.photo} />
-                  <b>{mate.name}</b>
-                  <small>{[mate.city, mate.occupation || mate.qualification].filter(Boolean).join(" · ") || t("batchmate")}</small>
-                </article>
-              ))}
+        <nav className="member-nav no-print" aria-label={t("profile")}>
+          <button type="button" className={view === "profile" ? "on" : ""} onClick={() => setView("profile")}>{t("profile")}</button>
+          <button type="button" className={view === "friends" ? "on" : ""} onClick={() => setView("friends")}>{t("findFriends")}</button>
+          <button type="button" className={view === "settings" ? "on" : ""} onClick={() => setView("settings")}>{t("settings")}</button>
+        </nav>
+
+        {view === "profile" && (
+          <section className="card profile-card">
+            <div className="sec-h no-print">
+              <h2>{showForm && unfinished ? t("completeProfile") : t("yourProfile")}</h2>
+              <div className="sheet-actions">
+                {!showForm && (
+                  <>
+                    <button type="button" className="btn ghost sm" onClick={printSheet}>{t("printForm")}</button>
+                    <button type="button" className="btn ghost sm" onClick={printSheet}>{t("downloadPdf")}</button>
+                    <button type="button" className="btn ghost sm" onClick={() => setEditing(true)}>{t("editProfile")}</button>
+                  </>
+                )}
+                {!unfinished && showForm && (
+                  <button type="button" className="btn ghost sm" onClick={() => setEditing(false)}>{t("close")}</button>
+                )}
+              </div>
             </div>
-          ) : (
-            <p className="muted">{t("noBatchmates")}</p>
-          )}
-        </section>
-        <button className="btn ghost" onClick={logout}>{t("signOut")}</button>
+            {showForm ? (
+              <EditProfile
+                member={member}
+                code={inst?.code}
+                institutionName={inst?.name}
+                onSaved={(next) => { updateMember(next); setEditing(false); toast(t("profileSaved")); }}
+                onPrint={printSheet}
+              />
+            ) : (
+              <ProfileRecord member={member} institutionName={inst?.name} />
+            )}
+          </section>
+        )}
+
+        {view === "friends" && <FindFriends />}
+        {view === "settings" && <VisibilitySettings member={member} />}
+        <button className="btn ghost no-print" onClick={logout}>{t("signOut")}</button>
       </div>
     </div>
+  );
+}
+
+function FindFriends() {
+  const { t } = useI18n();
+  const { session } = useAuth();
+  const [query, setQuery] = useState("");
+  const [people, setPeople] = useState([]);
+  const [picked, setPicked] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const path = query.trim() ? `/api/me/alumni?q=${encodeURIComponent(query.trim())}` : "/api/me/batchmates";
+      api(path)
+        .then((data) => {
+          setPeople(data.alumni || data.batchmates || []);
+          setErr("");
+        })
+        .catch((error) => {
+          setPeople([]);
+          setErr(error.message);
+        });
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [query]);
+
+  return (
+    <section className="card no-print">
+      <h2>{t("findFriends")}</h2>
+      <p className="sub">{t("friendsHint")}</p>
+      <Field label={t("searchFriends")}>
+        <input value={query} placeholder={t("searchFriendsPh")} onChange={(event) => { setQuery(event.target.value); setPicked(null); }} />
+      </Field>
+      <ErrBox msg={err} />
+      {people.length ? (
+        <div className="mate-grid">
+          {people.map((mate) => (
+            <button type="button" className={`mate mate-btn ${picked?.id === mate.id ? "on" : ""}`} key={mate.id} onClick={() => setPicked(mate)}>
+              <Avatar name={mate.name} photo={mate.photo} />
+              <b>{mate.name}</b>
+              <small>{[mate.batch ? t("batchTag", { year: mate.batch }) : "", mate.city, mate.occupation].filter(Boolean).join(" · ") || t("batchmate")}</small>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">{query.trim() ? t("noFriends") : t("noBatchmates")}</p>
+      )}
+      {picked && (
+        <div className="friend-record">
+          <div className="sec-h">
+            <h2>{picked.name}</h2>
+            <button type="button" className="btn ghost sm" onClick={() => setPicked(null)}>{t("close")}</button>
+          </div>
+          <ProfileRecord member={picked} institutionName={session.institution?.name} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function VisibilitySettings({ member }) {
+  const { t } = useI18n();
+  const { updateMember } = useAuth();
+  const toast = useToast();
+  const [visibility, setVisibility] = useState(() => visibilityFrom(member));
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setVisibility(visibilityFrom(member));
+  }, [member]);
+
+  const save = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const data = await api("/api/me/visibility", { method: "PATCH", body: { visibility } });
+      updateMember(data.member);
+      toast(t("visibilitySaved"));
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card no-print">
+      <h2>{t("visibilityTitle")}</h2>
+      <p className="sub">{t("visibilityHint")}</p>
+      <ErrBox msg={err} />
+      {VISIBILITY_GROUPS.map((group) => (
+        <div className="sheet-sec" key={group.title[0]}>
+          <h3>{group.title[0]}</h3>
+          <p className="ta" lang="ta">{group.title[1]}</p>
+          {group.fields.map(([key, label]) => {
+            const shown = member.gender === "Female" && key === "spouseName" ? BI.husbandName
+              : member.gender === "Female" && key === "spouseOccupation" ? BI.husbandOccupation
+              : member.gender === "Female" && key === "spouseCompany" ? BI.husbandCompany
+              : label;
+            return (
+            <div className="vis-row" key={key}>
+              <span className="bi-label">
+                <b>{shown[0]}</b>
+                <small lang="ta">{shown[1]}</small>
+              </span>
+              <select
+                value={visibility[key]}
+                aria-label={shown[0]}
+                onChange={(event) => setVisibility((current) => ({ ...current, [key]: event.target.value }))}
+              >
+                <option value="everyone">{t("visibilityEveryone")}</option>
+                <option value="batch">{t("visibilityBatch")}</option>
+                <option value="off">{t("visibilityOff")}</option>
+              </select>
+            </div>
+            );
+          })}
+        </div>
+      ))}
+      <p className="sub">{BI.photo[0]} / {BI.photo[1]} · {BI.name[0]} / {BI.name[1]} — {t("alwaysVisible")}</p>
+      <button type="button" className="btn brass" disabled={busy} onClick={save}>{busy ? t("saving") : t("saveProfile")}</button>
+    </section>
   );
 }
 
@@ -132,7 +265,7 @@ function IdentityRequest({ member }) {
   };
 
   return (
-    <div className="profile-block" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}>
+    <div className="profile-block no-print" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}>
       <h3>{t("requestIdentity")}</h3>
       <p className="sub">{t("requestIdentityHint")}</p>
       {pending && <div className="note">{t("identityPending")}</div>}
@@ -160,26 +293,21 @@ const isJoinedYear = (value) => {
   const year = Number(String(value).trim());
   return /^\d{4}$/.test(String(value).trim()) && year >= 1950 && year <= new Date().getFullYear() + 1;
 };
-const STEPS = ["stepMembership", "stepAddress", "stepFamily", "stepWork"];
 
 function needsProfile(member) {
   return !String(member.father || "").trim() || !String(member.mother || "").trim();
 }
 
-function EditProfile({ member, code, onSaved }) {
+function EditProfile({ member, code, institutionName, onSaved, onPrint }) {
   const { t } = useI18n();
   const { updateMember } = useAuth();
   const [batches, setBatches] = useState([]);
   const [form, setForm] = useState(() => formFromMember(member));
-  const [currentPw, setCurrentPw] = useState("");
-  const [pw, setPw] = useState("");
-  const [pw2, setPw2] = useState("");
   const [photo, setPhoto] = useState(member.photo || "");
   const [photoFile, setPhotoFile] = useState(null);
-  const [step, setStep] = useState(1);
+  const [issues, setIssues] = useState({});
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const setup = needsProfile(member);
 
   useEffect(() => {
     if (!code) return;
@@ -222,57 +350,37 @@ function EditProfile({ member, code, onSaved }) {
     }
   };
 
-  const stepError = () => {
-    if (step === 1) {
-      if (!form.name.trim()) return t("enterName");
-      if (!isEmail(form.email)) return t("badEmail");
-      if (!isMobile(form.mobile)) return t("badMobile");
-      if (!isJoinedYear(form.batch)) return t("badYear");
-    }
-    if (step === 3 && (!form.father.trim() || !form.mother.trim())) return t("enterParents");
-    return "";
-  };
-
-  const next = () => {
-    const message = stepError();
-    if (message) {
-      setErr(message);
-      return;
-    }
+  const reset = () => {
+    setForm(formFromMember(member));
+    setIssues({});
     setErr("");
-    setStep((current) => current + 1);
-    window.scrollTo(0, 0);
   };
 
   const save = async (event) => {
     event.preventDefault();
-    if (step < 4) {
-      next();
-      return;
-    }
-    const message = stepError();
-    if (message) return setErr(message);
+    const found = formIssues(form);
+    const labels = Object.fromEntries(Object.entries(found).map(([key, code]) => [key, t(code)]));
+    if (!form.name.trim()) labels.name = t("enterName");
+    if (!isJoinedYear(form.batch)) labels.batch = t("badYear");
     if (!form.father.trim() || !form.mother.trim()) {
-      setErr(t("enterParents"));
-      setStep(3);
+      if (!form.father.trim()) labels.father = t("enterParents");
+      if (!form.mother.trim()) labels.mother = t("enterParents");
+    }
+    setIssues(labels);
+    if (Object.keys(labels).length) {
+      setErr(Object.values(labels)[0]);
       return;
     }
-    const changingPassword = currentPw || pw || pw2;
-    if (changingPassword) {
-      if (!currentPw) return setErr(t("needCurrentPw"));
-      if (pw.length < 6) return setErr(t("newPwShort"));
-      if (pw !== pw2) return setErr(t("pwMismatch"));
+    const body = { ...form };
+    if (!spouseRelevant(body.maritalStatus)) {
+      body.spouseName = "";
+      body.spouseOccupation = "";
+      body.spouseCompany = "";
     }
     setBusy(true);
     setErr("");
     try {
-      const data = await api("/api/me", {
-        method: "PATCH",
-        body: {
-          ...form,
-          ...(changingPassword ? { currentPw, pw } : {}),
-        },
-      });
+      const data = await api("/api/me", { method: "PATCH", body });
       onSaved({ ...data.member, photo: data.member.photo || photo });
     } catch (error) {
       setErr(error.message);
@@ -282,74 +390,36 @@ function EditProfile({ member, code, onSaved }) {
   };
 
   return (
-    <form className="profile-form wizard" onSubmit={save} noValidate>
-      <div className="wizard-steps">
-        {STEPS.map((key, index) => (
-          <button
-            key={key}
-            type="button"
-            className={step >= index + 1 ? "on" : ""}
-            onClick={() => index + 1 < step && (setErr(""), setStep(index + 1))}
-            disabled={index + 1 > step}
-          >
-            <i />
-            <small>{t("stepN", { n: index + 1 })}</small>
-            {t(key)}
-          </button>
-        ))}
-      </div>
+    <form className="profile-form" onSubmit={save} noValidate>
+      <p className="sub no-print">{needsProfile(member) ? t("completeProfileHint") : t("editSeeHint")}</p>
       <ErrBox msg={err} />
-      <p className="sub">{setup ? t("completeProfileHint") : t("editSeeHint")}</p>
-
-      {step === 1 && (
-        <>
-          <PhotoPicker
-            name={form.name || member.name}
-            photo={photo}
-            file={photoFile}
-            onFile={(file, message) => {
-              if (message) {
-                setErr(message);
-                return;
-              }
-              setErr("");
-              setPhotoFile(file);
-              storePhoto(file);
-            }}
-            onClear={clearPhoto}
-          />
-          <MembershipFields form={form} setForm={setForm} batches={batches} lockIdentity />
-          <IdentityRequest member={member} />
-        </>
-      )}
-      {step === 2 && <AddressFields form={form} setForm={setForm} />}
-      {step === 3 && <FamilyFields form={form} setForm={setForm} />}
-      {step === 4 && (
-        <>
-          <WorkFields form={form} setForm={setForm} />
-          <div className="profile-block">
-            <h3>{t("changePassword")}</h3>
-            <p className="sub">{t("passwordNext")}</p>
-            <PasswordField label={t("currentPassword")} autoComplete="current-password" placeholder={t("currentPassword")} value={currentPw} onChange={(event) => setCurrentPw(event.target.value)} />
-            <div className="row">
-              <PasswordField label={t("newPassword")} autoComplete="new-password" value={pw} onChange={(event) => setPw(event.target.value)} />
-              <PasswordField label={t("confirmNewPassword")} autoComplete="new-password" value={pw2} onChange={(event) => setPw2(event.target.value)} />
-            </div>
-          </div>
-        </>
-      )}
-
-      <div className="wizard-actions">
-        {step > 1 && (
-          <button type="button" className="btn ghost" onClick={() => { setErr(""); setStep((current) => current - 1); }}>{t("back")}</button>
-        )}
-        {step < 4 ? (
-          <button type="button" className="btn brass" onClick={next}>{t("continue")}</button>
-        ) : (
-          <button className="btn brass" disabled={busy}>{busy ? t("saving") : t("saveProfile")}</button>
-        )}
+      <RegistrationSheet
+        form={form}
+        setForm={setForm}
+        batches={batches}
+        lockIdentity
+        issues={issues}
+        photo={photo}
+        photoFile={photoFile}
+        institutionName={institutionName}
+        onPhoto={(file, message) => {
+          if (message) {
+            setErr(message);
+            return;
+          }
+          setErr("");
+          setPhotoFile(file);
+          storePhoto(file);
+        }}
+        onClearPhoto={clearPhoto}
+        identity={<IdentityRequest member={member} />}
+      />
+      <div className="wizard-actions no-print">
+        <button type="button" className="btn ghost" onClick={reset}>{t("resetForm")}</button>
+        <button type="button" className="btn ghost" onClick={onPrint}>{t("printForm")}</button>
+        <button type="button" className="btn ghost" onClick={onPrint}>{t("downloadPdf")}</button>
+        <button className="btn brass" disabled={busy}>{busy ? t("saving") : t("saveProfile")}</button>
       </div>
     </form>
   );
 }
-

@@ -125,11 +125,18 @@ export function addressLine(addr) {
 
 export function cleanJob(value) {
   const source = value && typeof value === "object" ? value : {};
+  const address = text(source.address, 300);
+  const phone = text(source.phone, 20);
+  const email = text(source.email, 160);
+  const legacy = text(source.contact, 400);
   return {
     orgName: text(source.orgName, 160),
     designation: text(source.designation, 120),
     orgType: text(source.orgType, 120),
-    contact: text(source.contact, 400),
+    address,
+    phone,
+    email,
+    contact: [address, phone, email].filter(Boolean).join(" · ") || legacy,
   };
 }
 
@@ -143,7 +150,7 @@ export function cleanStudy(value) {
 }
 
 export function cleanSiblings(items) {
-  return cleanList(items, ["name", "gender", "dob", "org", "alumniId"], 2).map((item) => ({
+  return cleanList(items, ["name", "gender", "dob", "org", "alumniId"], 12).map((item) => ({
     ...item,
     gender: SIBLING_GENDERS.includes(item.gender) ? item.gender : "",
   }));

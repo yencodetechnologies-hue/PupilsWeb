@@ -384,7 +384,7 @@ tbody tr:hover td { background: rgba(212, 175, 55, 0.12); }
 .wizard-steps button.on { color: var(--ink); }
 .wizard-steps button.on i { background: var(--brass); }
 .wizard-steps small { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.wizard-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.wizard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 8px; }
 .add-block, .rep { width: 100%; text-align: left; border-radius: 14px; margin-bottom: 10px; }
 .add-block { border: 1px dashed var(--line); background: transparent; padding: 14px 16px; cursor: pointer; }
 .add-block strong { display: block; }
@@ -411,6 +411,32 @@ tbody tr:hover td { background: rgba(212, 175, 55, 0.12); }
 .mate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .mate { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: var(--paper); }
 .mate b { display: block; margin-top: 10px; }
+.mate-btn { width: 100%; text-align: left; cursor: pointer; color: inherit; }
+.mate-btn small { display: block; color: var(--muted); margin-top: 2px; }
+.mate-btn.on { outline: 2px solid var(--primary); }
+.friend-record { margin-top: 16px; }
+.member-nav { display: flex; gap: 6px; padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+.member-nav button { flex: 1; border: 0; background: transparent; border-radius: 12px; padding: 10px 8px; font-weight: 800; color: var(--muted); cursor: pointer; }
+.member-nav button.on { background: var(--primary); color: #fff; }
+.sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.bi-label { display: flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+.bi-label b { font-size: 13px; font-weight: 800; }
+.bi-label small, .ta { font-family: "Noto Sans Tamil", "Manrope", sans-serif; color: var(--muted); font-size: 12px; font-weight: 500; }
+.sheet-sec { border: 1px solid #1f2937; border-radius: 16px; padding: 14px 14px 4px; margin-bottom: 14px; background: #fff; }
+.sheet-sec h2 { font-size: 22px; }
+.sheet-sec h3 { font-size: 18px; margin-bottom: 8px; }
+.sheet-sec .ta { margin: 2px 0 12px; }
+.sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.sheet-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.sheet-sub { font-size: 18px; margin: 4px 0 8px; }
+.sheet-sub small { display: block; font-family: "Noto Sans Tamil", "Manrope", sans-serif; color: var(--muted); font-size: 13px; font-weight: 500; }
+.reg-sheet input, .reg-sheet select, .reg-sheet textarea { border-color: #111827; border-radius: 8px; }
+.field-err { color: #9f1239; font-size: 12px; font-style: normal; font-weight: 700; }
+.vis-row { display: grid; grid-template-columns: 1fr minmax(150px, 190px); gap: 12px; align-items: center; margin-bottom: 12px; }
+.rec-line { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 8px; margin-bottom: 10px; }
+.rec-line dt, .rec-line dd { margin: 0; }
+.rec-line small { display: block; }
+.print-only, .print-foot { display: none; }
 .person {
   width: 100%; display: flex; justify-content: space-between; gap: 12px; align-items: center; text-align: left;
   padding: 12px 14px 12px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--card);
@@ -500,7 +526,7 @@ tbody tr:hover td { background: rgba(212, 175, 55, 0.12); }
   .stat { padding: 14px 14px 12px 16px; border-radius: 16px; }
   .stat b { font-size: 28px; }
   .stat span { display: block; font-size: 12px; line-height: 1.35; }
-  .grid2, .split-form, .row, .row3 { grid-template-columns: 1fr; }
+  .grid2, .split-form, .row, .row3, .sheet-grid, .sheet-pair, .vis-row, .rec-line { grid-template-columns: 1fr; }
   .row, .row3 { gap: 0; }
   .grid2 { gap: 14px; }
   .split-form { gap: 0; }
@@ -623,4 +649,26 @@ tbody tr:hover td { background: rgba(212, 175, 55, 0.12); }
   .btn:hover { filter: none; }
   .drawer { animation: none; }
   .btn:active, .icon-btn:active, .person:active { transform: none; }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm 18mm;
+    @bottom-center {
+      content: counter(page);
+      font-family: "Noto Sans Tamil", "Manrope", sans-serif;
+      font-size: 10pt;
+    }
+  }
+  body { background: #fff !important; }
+  .no-print, .join-hero, .member-nav, .toast, .lang-toggle { display: none !important; }
+  .join-wrap { max-width: none; padding: 0; }
+  .join-body { margin: 0; }
+  .card { border: 0; box-shadow: none; padding: 0; background: #fff; }
+  .sheet-sec, .rep, .bi-field, .rec-line { break-inside: avoid; page-break-inside: avoid; }
+  .print-only { display: block; }
+  .sheet-print-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; border-bottom: 1px solid #111; padding-bottom: 6px; }
+  .sheet-pair { grid-template-columns: 1fr; }
+  .reg-sheet input, .reg-sheet select, .reg-sheet textarea { border: 1px solid #111; background: #fff; }
 }
