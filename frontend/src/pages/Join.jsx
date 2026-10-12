@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { Brand, ErrBox, Field, Loading, PasswordField } from "../components";
@@ -66,6 +66,7 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
   const { setSession } = useAuth();
   const navigate = useNavigate();
   const [err, setErr] = useState("");
+  const errRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", batch: "", yearCompleted: "", mobile: "", pw: "", pw2: "" });
@@ -76,11 +77,15 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
   };
   const years = [...(inst.batches || [])].sort((a, b) => b - a);
 
+  useEffect(() => {
+    if (err) errRef.current?.scrollIntoView({ block: "center" });
+  }, [err]);
+
   const submit = async (event) => {
     event.preventDefault();
     if (!form.name.trim()) return setErr(t("enterName"));
     if (!isEmail(form.email)) return setErr(t("badEmail"));
-    if (!form.yearCompleted) return setErr(t("selectBatch"));
+    if (!form.yearCompleted) return setErr(t("selectYearCompleted"));
     if (!isMobile(form.mobile)) return setErr(t("badMobile"));
     if (form.pw.length < 6) return setErr(t("shortPassword"));
     if (form.pw !== form.pw2) return setErr(t("passwordMismatch"));
@@ -141,7 +146,6 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
         <p>{t("joinSteps")}</p>
       </header>
       <form className="join-body card" onSubmit={submit} noValidate>
-        <ErrBox msg={err} />
         {!inst.batches.length && <ErrBox msg={t("noBatchesAdmin")} />}
         <Field label={t("memberNo")} hint={t("memberNoHint")}>
           <input value={nextMemberNo} readOnly disabled placeholder={t("memberNoAuto")} />
@@ -160,6 +164,7 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
         </Field>
         <PasswordField label={t("password")} autoComplete="new-password" value={form.pw} onChange={set("pw")} />
         <PasswordField label={t("confirmPassword")} autoComplete="new-password" value={form.pw2} onChange={set("pw2")} />
+        <div ref={errRef}><ErrBox msg={err} /></div>
         <button className="btn brass block" disabled={busy || !inst.batches.length}>{busy ? t("creating") : t("createAccount")}</button>
         <p className="alt">{t("alreadyJoined")} <Link to="/" className="link">{t("signIn")}</Link></p>
       </form>
