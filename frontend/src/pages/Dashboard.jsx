@@ -631,11 +631,12 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
                     <button type="button" className="alum-card" key={member.id} onClick={() => setOpen(member.id)}>
                       <Avatar name={member.name} photo={member.photo} />
                       <span className="alum-copy">
-                        <b>{member.name}</b>
-                        <small>{roleLine(member, t)}</small>
-                        <span className="alum-place">{placeLine(member, t)}</span>
+                        <span className="alum-top">
+                          <b>{member.name}</b>
+                          {member.memberNo && <span className="alum-no">{member.memberNo}</span>}
+                        </span>
+                        <small>{[roleLine(member, t), placeLine(member, t)].filter(Boolean).join(" · ")}</small>
                         {member.mobile && <small className="alum-phone">{member.mobile}</small>}
-                        {member.memberNo && <span className="alum-no">{member.memberNo}</span>}
                         {member.identityRequest && <span className="pending-badge">{t("updateRequested")}</span>}
                       </span>
                     </button>
