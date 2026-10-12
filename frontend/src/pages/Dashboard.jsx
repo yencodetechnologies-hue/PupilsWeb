@@ -35,7 +35,7 @@ export function Dashboard() {
   const applyInst = (institution) => updateInstitution(institution);
 
   const go = (key) => { setFocusYear(null); setTab(key); window.scrollTo(0, 0); };
-  const openBatch = (year) => { setFocusYear(year); setTab("members"); };
+  const openBatch = (year) => { setFocusYear(year); setTab("members"); loadMembers(); };
   const countFor = (key) => (key === "members" ? members?.length ?? 0 : key === "batches" ? inst.batches.length : null);
 
   const nav = TABS.map(([key, label]) => (
@@ -81,6 +81,7 @@ export function Dashboard() {
               members={members}
               setTab={go}
               focusYear={focusYear}
+              reload={loadMembers}
               onRemove={(id) => setMembers((list) => list.filter((item) => item.id !== id))}
               onUpdate={(member) => setMembers((list) => list.map((item) => (item.id === member.id ? member : item)))}
             />
@@ -232,7 +233,7 @@ function Overview({ inst, members, setTab }) {
     return sum + (jobs || member.businesses?.length || 0);
   }, 0);
   const cities = new Set(list.map((member) => (member.city || "").trim().toLowerCase()).filter(Boolean)).size;
-  const byBatch = [...inst.batches].sort((a, b) => b - a).map((year) => [year, list.filter((member) => member.batch === year).length]);
+  const byBatch = [...inst.batches].sort((a, b) => b - a).map((year) => [year, list.filter((member) => sameYear(completedYearOf(member), year)).length]);
   const max = Math.max(1, ...byBatch.map((item) => item[1]));
   const recent = [...list].sort((a, b) => b.joinedAt - a.joinedAt).slice(0, 6);
 
@@ -300,7 +301,7 @@ function Overview({ inst, members, setTab }) {
                   <Avatar name={member.name} photo={member.photo} />
                   <div>
                     <b>{member.name}</b>
-                    <small>{t("batchTag", { year: member.batch })} · {member.city || member.occupation || t("alumni")}</small>
+                    <small>{t("batchTag", { year: completedYearOf(member) || member.batch })} · {member.city || member.occupation || t("alumni")}</small>
                   </div>
                 </li>
               ))}
@@ -354,7 +355,7 @@ function Batches({ inst, members, onChange, onOpen }) {
   };
 
   const remove = async (year) => {
-    if (members.some((member) => member.batch === year)) return toast(t("batchHasAlumni", { year }), "err");
+    if (members.some((member) => sameYear(completedYearOf(member), year))) return toast(t("batchHasAlumni", { year }), "err");
     try {
       const data = await api(`/api/batches/${year}`, { method: "DELETE" });
       onChange(data.institution);
@@ -408,7 +409,7 @@ function Batches({ inst, members, onChange, onOpen }) {
                   <button type="button" className="spine-x" onClick={() => remove(year)} aria-label={t("removeBatch", { year })}>×</button>
                   <button type="button" className="spine-open" onClick={() => onOpen(year)} aria-label={t("openBatchAria", { year })}>
                     <span className="yr">{year}</span>
-                    <span className="n">{t("alumniCount", { n: members.filter((member) => member.batch === year).length })}</span>
+                    <span className="n">{t("alumniCount", { n: members.filter((member) => sameYear(completedYearOf(member), year)).length })}</span>
                   </button>
                 </div>
               ))}
@@ -499,44 +500,69 @@ function placeLine(member, t) {
     || t("cityNotSet");
 }
 
-function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
+function yearKey(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const num = Number(text);
+  return Number.isFinite(num) ? num : text;
+}
+
+function completedYearOf(member) {
+  const completed = String(member?.yearCompleted ?? "").trim();
+  if (completed) return yearKey(completed);
+  if (member?.batch != null && String(member.batch).trim() !== "") return yearKey(member.batch);
+  return "";
+}
+
+function sameYear(a, b) {
+  const left = yearKey(a);
+  const right = yearKey(b);
+  return left !== "" && left === right;
+}
+
+function byUpdate(a, b) {
+  const pending = (member) => member.identityRequest?.requestedAt || 0;
+  const updateDelta = pending(b) - pending(a);
+  if (updateDelta) return updateDelta;
+  return (b.joinedAt || 0) - (a.joinedAt || 0);
+}
+
+function Members({ inst, members, setTab, onRemove, onUpdate, focusYear, reload }) {
   const { t } = useI18n();
   const toast = useToast();
   const [query, setQuery] = useState("");
-  const [pinned, setPinned] = useState(focusYear);
+  const [pinned, setPinned] = useState(() => (focusYear == null ? null : yearKey(focusYear)));
   const [open, setOpen] = useState(null);
   const list = members || [];
 
-  const catalog = useMemo(() => {
+  const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matches = (member) => !needle || [
       member.memberNo, member.name, member.email, member.mobile, member.city, member.occupation,
-      member.qualification, member.currentJob?.orgName, member.currentJob?.designation,
+      member.qualification, member.yearCompleted, member.batch, member.currentJob?.orgName, member.currentJob?.designation,
       member.previousJob?.orgName, member.spouseName,
       ...(member.businesses || []).map((item) => item.name),
     ].join(" ").toLowerCase().includes(needle);
-    const years = [...new Set([...(inst.batches || []), ...list.map((member) => member.batch)])]
-      .filter((year) => year !== "" && year != null)
+    const years = [...new Set([...(inst.batches || []).map(yearKey), ...list.map(completedYearOf)])]
+      .filter((year) => year !== "")
       .sort((a, b) => b - a);
-    return years
-      .map((year) => ({
-        year,
-        group: list.filter((member) => member.batch === year && matches(member)).sort((a, b) => a.name.localeCompare(b.name)),
-      }))
-      .filter((item) => !needle || item.group.length);
+    return years.map((year) => ({
+      year,
+      group: list.filter((member) => sameYear(completedYearOf(member), year) && matches(member)).sort(byUpdate),
+    }));
   }, [inst.batches, list, query]);
 
-  const matchCount = catalog.reduce((sum, item) => sum + item.group.length, 0);
+  const visible = pinned == null ? groups.filter((item) => !query.trim() || item.group.length) : groups.filter((item) => sameYear(item.year, pinned));
+  const matchCount = visible.reduce((sum, item) => sum + item.group.length, 0);
 
   useEffect(() => {
-    if (focusYear == null || !members) return;
-    setPinned(focusYear);
-    document.getElementById(`batch-${focusYear}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [focusYear, members]);
+    setPinned(focusYear == null ? null : yearKey(focusYear));
+  }, [focusYear]);
 
-  const jump = (year) => {
-    setPinned(year);
-    document.getElementById(`batch-${year}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const selectYear = (year) => {
+    setPinned(year == null ? null : yearKey(year));
+    reload?.();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const openMember = list.find((member) => member.id === open);
@@ -564,7 +590,7 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
         <div>
           <p className="eyebrow">{t("directory")}</p>
           <h1>{t("alumni")}</h1>
-          <p>{t("joinedAcross", { n: list.length, b: inst.batches.length })}</p>
+          <p>{pinned == null ? t("joinedAcross", { n: list.length, b: inst.batches.length }) : t("showingCompleted", { year: pinned, n: matchCount })}</p>
         </div>
         <button className="btn ghost" disabled={!list.length} onClick={exportFile}>{t("exportCsv")}</button>
       </header>
@@ -576,17 +602,27 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
           </label>
           {!!members && <span className="match-line">{t("alumniCount", { n: matchCount })}</span>}
         </div>
-        {!!members && !!catalog.length && (
-          <div className="year-rail" aria-label={t("batches")}>
-            {catalog.map(({ year, group }) => (
+        {!!members && !!groups.length && (
+          <div className="year-rail" aria-label={t("filterBatch")}>
+            <button
+              type="button"
+              className={`year-chip ${pinned == null ? "on" : ""}`}
+              aria-current={pinned == null ? "true" : undefined}
+              aria-label={t("allBatches")}
+              onClick={() => selectYear(null)}
+            >
+              <b>{t("all")}</b>
+              <small>{groups.reduce((sum, item) => sum + item.group.length, 0)}</small>
+            </button>
+            {groups.map(({ year, group }) => (
               <button
                 type="button"
                 key={year}
                 id={`jump-${year}`}
-                className={`year-chip ${pinned === year ? "on" : ""}`}
-                aria-current={pinned === year ? "true" : undefined}
+                className={`year-chip ${sameYear(pinned, year) ? "on" : ""}`}
+                aria-current={sameYear(pinned, year) ? "true" : undefined}
                 aria-label={t("jumpToBatch", { year })}
-                onClick={() => jump(year)}
+                onClick={() => selectYear(year)}
               >
                 <b>{year}</b>
                 <small>{group.length}</small>
@@ -603,7 +639,7 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
             <button className="btn" onClick={() => setTab("link")}>{t("getJoinLink")}</button>
           </div>
         </div>
-      ) : !catalog.length ? (
+      ) : !visible.length || (query.trim() && !matchCount && pinned == null) ? (
         <div className="card empty"><h2>{t("noMatches")}</h2><p>{t("tryDifferent")}</p></div>
       ) : (
         <>
@@ -616,11 +652,11 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
               </div>
             </div>
           )}
-          {catalog.map(({ year, group }) => (
-            <section className={`batch-group ${pinned === year ? "focus" : ""}`} id={`batch-${year}`} key={year}>
+          {visible.map(({ year, group }) => (
+            <section className={`batch-group ${sameYear(pinned, year) ? "focus" : ""}`} id={`batch-${year}`} key={year}>
               <header className="batch-head">
                 <div>
-                  <p className="eyebrow">{t("batch")}</p>
+                  <p className="eyebrow">{t("yearCompleted")}</p>
                   <h2>{year}</h2>
                 </div>
                 <span className="year-count ink">{t("alumniCount", { n: group.length })}</span>
@@ -643,7 +679,7 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
                   ))}
                 </div>
               ) : (
-                <p className="year-empty">{t("emptyBatch")}</p>
+                <p className="year-empty">{query.trim() ? t("noMatches") : t("emptyBatch")}</p>
               )}
             </section>
           ))}

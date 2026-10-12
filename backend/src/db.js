@@ -310,7 +310,23 @@ export async function saveMemberPhoto(id, photo, photoId) {
 }
 
 export async function countInBatch(instId, year) {
-  return members().countDocuments({ instId, batch: year });
+  const numeric = Number(year);
+  const text = String(year);
+  return members().countDocuments({
+    instId,
+    $or: [
+      { yearCompleted: text },
+      { yearCompleted: numeric },
+      {
+        batch: numeric,
+        $or: [
+          { yearCompleted: "" },
+          { yearCompleted: null },
+          { yearCompleted: { $exists: false } },
+        ],
+      },
+    ],
+  });
 }
 
 export async function deleteMember(id, instId) {
@@ -338,11 +354,25 @@ export async function deleteOtp(email) {
   await otps().deleteOne({ email });
 }
 
-export async function batchmates(instId, batch, exceptId) {
-  const rows = await members()
-    .find({ instId, batch: Number(batch), id: { $ne: exceptId } })
-    .sort({ name: 1 })
-    .toArray();
+export async function batchmates(instId, member, exceptId) {
+  const completed = String(member?.yearCompleted || "").trim();
+  const numeric = Number(completed);
+  const filter = { instId, id: { $ne: exceptId } };
+  if (completed) {
+    filter.$or = Number.isFinite(numeric)
+      ? [{ yearCompleted: completed }, { yearCompleted: numeric }]
+      : [{ yearCompleted: completed }];
+  } else if (member?.batch != null && member.batch !== "") {
+    filter.batch = Number(member.batch);
+    filter.$or = [
+      { yearCompleted: "" },
+      { yearCompleted: null },
+      { yearCompleted: { $exists: false } },
+    ];
+  } else {
+    return [];
+  }
+  const rows = await members().find(filter).sort({ name: 1 }).toArray();
   return rows.map(clean);
 }
 

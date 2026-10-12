@@ -40,7 +40,7 @@ export function MemberHome() {
         <Brand />
         <p className="eyebrow light">{member.name}</p>
         <h1>{inst?.name || t("yourInstitution")}</h1>
-        <p>{t("batchTag", { year: member.batch })}</p>
+        <p>{t("batchTag", { year: member.yearCompleted || member.batch })}</p>
       </header>
       <div className="join-body stack">
         <nav className="member-nav no-print" aria-label={t("profile")}>
@@ -126,7 +126,7 @@ function FindFriends() {
             <button type="button" className={`mate mate-btn ${picked?.id === mate.id ? "on" : ""}`} key={mate.id} onClick={() => setPicked(mate)}>
               <Avatar name={mate.name} photo={mate.photo} />
               <b>{mate.name}</b>
-              <small>{[mate.batch ? t("batchTag", { year: mate.batch }) : "", mate.city, mate.occupation].filter(Boolean).join(" · ") || t("batchmate")}</small>
+              <small>{[(mate.yearCompleted || mate.batch) ? t("batchTag", { year: mate.yearCompleted || mate.batch }) : "", mate.city, mate.occupation].filter(Boolean).join(" · ") || t("batchmate")}</small>
             </button>
           ))}
         </div>

@@ -607,7 +607,7 @@ app.post("/api/join/:code", wrap(async (req, res) => {
 const memberOnly = requireUser("member");
 
 app.get("/api/me/batchmates", memberOnly, wrap(async (req, res) => {
-  const rows = await batchmates(req.member.instId, req.member.batch, req.member.id);
+  const rows = await batchmates(req.member.instId, req.member, req.member.id);
   res.json({ batchmates: rows.map((row) => applyVisibility(publicMember(row), req.member)) });
 }));
 
