@@ -314,7 +314,7 @@ function Batches({ inst, members, onChange, onOpen }) {
         document.querySelector(".spines")?.scrollIntoView({ block: "center", behavior: "smooth" });
       });
     } catch (error) {
-      toast(error.message);
+      toast(error.message, "err");
     } finally {
       setBusy(false);
     }
@@ -323,7 +323,7 @@ function Batches({ inst, members, onChange, onOpen }) {
   const addOne = (event) => {
     event.preventDefault();
     const year = Number(one);
-    if (!one || String(year).length !== 4) return toast(t("badYear"));
+    if (!one || String(year).length !== 4) return toast(t("badYear"), "err");
     run({ years: [year] }, () => setOne(""));
   };
 
@@ -331,18 +331,18 @@ function Batches({ inst, members, onChange, onOpen }) {
     event.preventDefault();
     const start = Number(from);
     const end = Number(to);
-    if (!start || !end || String(start).length !== 4 || String(end).length !== 4) return toast(t("badRange"));
+    if (!start || !end || String(start).length !== 4 || String(end).length !== 4) return toast(t("badRange"), "err");
     run({ from: start, to: end }, () => { setFrom(""); setTo(""); });
   };
 
   const remove = async (year) => {
-    if (members.some((member) => member.batch === year)) return toast(t("batchHasAlumni", { year }));
+    if (members.some((member) => member.batch === year)) return toast(t("batchHasAlumni", { year }), "err");
     try {
       const data = await api(`/api/batches/${year}`, { method: "DELETE" });
       onChange(data.institution);
       toast(t("batchRemoved", { year }));
     } catch (error) {
-      toast(error.message);
+      toast(error.message, "err");
     }
   };
 
@@ -422,7 +422,7 @@ function JoinLink({ inst, onChange }) {
       onChange(data.institution);
       toast(t("newLinkReady"));
     } catch (error) {
-      toast(error.message);
+      toast(error.message, "err");
     }
   };
 
@@ -520,13 +520,13 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear }) {
       setOpen(null);
       toast(t("removed"));
     } catch (error) {
-      toast(error.message);
+      toast(error.message, "err");
     }
   };
 
   const exportFile = async () => {
     try { await downloadCsv(); }
-    catch (error) { toast(error.message); }
+    catch (error) { toast(error.message, "err"); }
   };
 
   return (

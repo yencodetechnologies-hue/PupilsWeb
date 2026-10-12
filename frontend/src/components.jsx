@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { formatDate, genderLabel, LangToggle, maritalLabel, useI18n } from "./i18n";
 import { addressLine, spouseLabelKeys } from "./memberShape";
 
@@ -18,6 +18,7 @@ const ICONS = {
   logout: "M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10",
   chevron: "M9 6l6 6-6 6",
   close: "M6 6l12 12M18 6L6 18",
+  alert: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v5M12 16.5h.01",
 };
 
 export function Icon({ name, size = 20 }) {
@@ -38,8 +39,18 @@ export function Brand() {
 }
 
 export function ErrBox({ msg }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!msg) return;
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [msg]);
   if (!msg) return null;
-  return <div className="err" role="alert">{msg}</div>;
+  return (
+    <div ref={ref} className="err" role="alert">
+      <Icon name="alert" size={18} />
+      <span>{msg}</span>
+    </div>
+  );
 }
 
 export function Avatar({ name, photo, large }) {

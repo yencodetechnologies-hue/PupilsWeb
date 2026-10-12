@@ -21,7 +21,7 @@ const ADDRESS_FIELDS = ["door", "street", "road", "area", "district", "state", "
 
 function BiField({ en, ta, children, error }) {
   return (
-    <label className="field bi-field">
+    <label className={error ? "field bi-field has-err" : "field bi-field"}>
       <span className="bi-label">
         <b>{en}</b>
         <small lang="ta">{ta}</small>

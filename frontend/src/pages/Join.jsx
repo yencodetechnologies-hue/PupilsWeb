@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { Brand, ErrBox, Field, Loading, PasswordField } from "../components";
@@ -70,16 +70,11 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
   const { setSession } = useAuth();
   const navigate = useNavigate();
   const [err, setErr] = useState("");
-  const errRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", batch: "", yearCompleted: "", mobile: "", pw: "", pw2: "" });
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const years = [...(inst.batches || [])].sort((a, b) => b - a);
-
-  useEffect(() => {
-    if (err) errRef.current?.scrollIntoView({ block: "center" });
-  }, [err]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -168,7 +163,7 @@ function JoinAccount({ inst, nextMemberNo, preview, onDone }) {
         </Field>
         <PasswordField label={t("password")} autoComplete="new-password" value={form.pw} onChange={set("pw")} />
         <PasswordField label={t("confirmPassword")} autoComplete="new-password" value={form.pw2} onChange={set("pw2")} />
-        <div ref={errRef}><ErrBox msg={err} /></div>
+        <ErrBox msg={err} />
         <button className="btn brass block" disabled={busy || !inst.batches.length}>{busy ? t("creating") : t("createAccount")}</button>
         <p className="alt">{t("alreadyJoined")} <Link to="/" className="link">{t("signIn")}</Link></p>
       </form>

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { Icon } from "./components";
 
 const AuthContext = createContext(null);
 const ToastContext = createContext(() => {});
@@ -15,7 +16,7 @@ export function useToast() {
 export function Providers({ children }) {
   const [session, setSession] = useState(null);
   const [ready, setReady] = useState(false);
-  const [toastMsg, setToastMsg] = useState("");
+  const [toastMsg, setToastMsg] = useState(null);
   const timer = useRef();
 
   useEffect(() => {
@@ -25,10 +26,10 @@ export function Providers({ children }) {
       .finally(() => setReady(true));
   }, []);
 
-  const toast = (message) => {
-    setToastMsg(message);
+  const toast = (message, kind = "ok") => {
+    setToastMsg({ message, kind });
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToastMsg(""), 3200);
+    timer.current = setTimeout(() => setToastMsg(null), 3200);
   };
 
   const updateInstitution = (institution) => {
@@ -43,7 +44,12 @@ export function Providers({ children }) {
     <AuthContext.Provider value={{ session, setSession, ready, updateInstitution, updateMember }}>
       <ToastContext.Provider value={toast}>
         {children}
-        {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
+        {toastMsg && (
+          <div className={toastMsg.kind === "err" ? "toast toast-err" : "toast"} role={toastMsg.kind === "err" ? "alert" : "status"}>
+            {toastMsg.kind === "err" && <Icon name="alert" size={18} />}
+            <span>{toastMsg.message}</span>
+          </div>
+        )}
       </ToastContext.Provider>
     </AuthContext.Provider>
   );
