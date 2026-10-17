@@ -746,12 +746,12 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear, reload 
                           </div>
                         </div>
                       </td>
-                      <td><span className="yr-pill">{completedYearOf(member) || "–"}</span></td>
-                      <td>{member.mobile || "–"}</td>
-                      <td className="dir-email">{member.email || "–"}</td>
-                      <td>{member.city || "–"}</td>
-                      <td>{member.currentJob?.designation || member.occupation || member.qualification || "–"}</td>
-                      <td>{member.currentJob?.orgName || member.businesses?.[0]?.name || "–"}</td>
+                      <td data-label={t("yearCompleted")}><span className="yr-pill">{completedYearOf(member) || "–"}</span></td>
+                      <td data-label={t("mobileNumber")}>{member.mobile || "–"}</td>
+                      <td className="dir-email" data-label={t("emailId")}>{member.email || "–"}</td>
+                      <td data-label={t("city")}>{member.city || "–"}</td>
+                      <td data-label={t("designation")}>{member.currentJob?.designation || member.occupation || member.qualification || "–"}</td>
+                      <td data-label={t("currentJob")}>{member.currentJob?.orgName || member.businesses?.[0]?.name || "–"}</td>
                     </tr>
                   ))}
                 </tbody>
