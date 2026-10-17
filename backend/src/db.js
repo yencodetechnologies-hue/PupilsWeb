@@ -383,3 +383,28 @@ export async function alumniSearch(instId, exceptId, query) {
   const rows = await members().find(filter).sort({ name: 1 }).limit(50).toArray();
   return rows.map(clean);
 }
+
+const events = () => database.collection("events");
+
+export async function eventsFor(instId) {
+  const rows = await events().find({ instId }).sort({ startAt: -1 }).toArray();
+  return rows.map(clean);
+}
+
+export async function getEvent(id) {
+  return clean(await events().findOne({ id }));
+}
+
+export async function insertEvent(row) {
+  await events().insertOne(row);
+}
+
+export async function updateEvent(id, fields) {
+  await events().updateOne({ id }, { $set: fields });
+}
+
+export async function deleteEvent(id, instId) {
+  return (await events().deleteOne({ id, instId })).deletedCount;
+}
+
+export const col = (name) => database.collection(name);

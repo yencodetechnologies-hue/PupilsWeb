@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api, downloadCsv } from "../api";
 import { joinUrl } from "../site";
 import { Avatar, Brand, Drawer, ErrBox, Field, Icon, MemberProfile, PasswordField } from "../components";
+import { AdminEvents } from "../events";
+import { JobBoard } from "../jobs";
 import { LangToggle, typeLabel, useI18n } from "../i18n";
 import { useAuth, useToast } from "../state";
 
@@ -10,6 +12,8 @@ const TABS = [
   ["overview", "overview"],
   ["batches", "batches"],
   ["link", "joinLink"],
+  ["events", "events"],
+  ["jobs", "jobs"],
   ["members", "alumni"],
   ["profile", "profile"],
 ];
@@ -86,6 +90,8 @@ export function Dashboard() {
               onUpdate={(member) => setMembers((list) => list.map((item) => (item.id === member.id ? member : item)))}
             />
           )}
+          {tab === "events" && <AdminEvents />}
+          {tab === "jobs" && <JobBoard isAdmin />}
           {tab === "profile" && <AccountProfile inst={inst} onChange={applyInst} />}
         </main>
         <nav className="tabbar" aria-label={t("sections")}>
@@ -531,11 +537,32 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear, reload 
   const { t } = useI18n();
   const toast = useToast();
   const [query, setQuery] = useState("");
-  const [pinned, setPinned] = useState(() => (focusYear == null ? null : yearKey(focusYear)));
+  const [year, setYear] = useState(() => (focusYear == null ? "" : String(yearKey(focusYear))));
+  const [city, setCity] = useState("");
   const [open, setOpen] = useState(null);
   const list = members || [];
 
-  const groups = useMemo(() => {
+  useEffect(() => {
+    setYear(focusYear == null ? "" : String(yearKey(focusYear)));
+  }, [focusYear]);
+
+  const years = useMemo(
+    () => [...new Set([...(inst.batches || []).map(yearKey), ...list.map(completedYearOf)])]
+      .filter((value) => value !== "")
+      .sort((a, b) => b - a),
+    [inst.batches, list],
+  );
+
+  const cities = useMemo(() => {
+    const seen = new Map();
+    list.forEach((member) => {
+      const name = (member.city || "").trim();
+      if (name && !seen.has(name.toLowerCase())) seen.set(name.toLowerCase(), name);
+    });
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [list]);
+
+  const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matches = (member) => !needle || [
       member.memberNo, member.name, member.email, member.mobile, member.city, member.occupation,
@@ -543,27 +570,15 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear, reload 
       member.previousJob?.orgName, member.spouseName,
       ...(member.businesses || []).map((item) => item.name),
     ].join(" ").toLowerCase().includes(needle);
-    const years = [...new Set([...(inst.batches || []).map(yearKey), ...list.map(completedYearOf)])]
-      .filter((year) => year !== "")
-      .sort((a, b) => b - a);
-    return years.map((year) => ({
-      year,
-      group: list.filter((member) => sameYear(completedYearOf(member), year) && matches(member)).sort(byUpdate),
-    }));
-  }, [inst.batches, list, query]);
+    return list
+      .filter((member) => (!year || sameYear(completedYearOf(member), year))
+        && (!city || (member.city || "").trim().toLowerCase() === city.toLowerCase())
+        && matches(member))
+      .sort((a, b) => (completedYearOf(b) || 0) - (completedYearOf(a) || 0) || byUpdate(a, b));
+  }, [list, query, year, city]);
 
-  const visible = pinned == null ? groups.filter((item) => !query.trim() || item.group.length) : groups.filter((item) => sameYear(item.year, pinned));
-  const matchCount = visible.reduce((sum, item) => sum + item.group.length, 0);
-
-  useEffect(() => {
-    setPinned(focusYear == null ? null : yearKey(focusYear));
-  }, [focusYear]);
-
-  const selectYear = (year) => {
-    setPinned(year == null ? null : yearKey(year));
-    reload?.();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const filtered = !!(query.trim() || year || city);
+  const clearFilters = () => { setQuery(""); setYear(""); setCity(""); };
 
   const openMember = list.find((member) => member.id === open);
 
@@ -590,47 +605,10 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear, reload 
         <div>
           <p className="eyebrow">{t("directory")}</p>
           <h1>{t("alumni")}</h1>
-          <p>{pinned == null ? t("joinedAcross", { n: list.length, b: inst.batches.length }) : t("showingCompleted", { year: pinned, n: matchCount })}</p>
+          <p>{year ? t("showingCompleted", { year, n: rows.length }) : t("joinedAcross", { n: list.length, b: inst.batches.length })}</p>
         </div>
         <button className="btn ghost" disabled={!list.length} onClick={exportFile}>{t("exportCsv")}</button>
       </header>
-      <div className="directory-bar">
-        <div className="search-row">
-          <label className="search-field">
-            <Icon name="search" size={18} />
-            <input placeholder={t("searchPh")} aria-label={t("searchAlumni")} value={query} onChange={(event) => setQuery(event.target.value)} />
-          </label>
-          {!!members && <span className="match-line">{t("alumniCount", { n: matchCount })}</span>}
-        </div>
-        {!!members && !!groups.length && (
-          <div className="year-rail" aria-label={t("filterBatch")}>
-            <button
-              type="button"
-              className={`year-chip ${pinned == null ? "on" : ""}`}
-              aria-current={pinned == null ? "true" : undefined}
-              aria-label={t("allBatches")}
-              onClick={() => selectYear(null)}
-            >
-              <b>{t("all")}</b>
-              <small>{groups.reduce((sum, item) => sum + item.group.length, 0)}</small>
-            </button>
-            {groups.map(({ year, group }) => (
-              <button
-                type="button"
-                key={year}
-                id={`jump-${year}`}
-                className={`year-chip ${sameYear(pinned, year) ? "on" : ""}`}
-                aria-current={sameYear(pinned, year) ? "true" : undefined}
-                aria-label={t("jumpToBatch", { year })}
-                onClick={() => selectYear(year)}
-              >
-                <b>{year}</b>
-                <small>{group.length}</small>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
       {!members ? <div className="card empty"><p>{t("loadingAlumni")}</p></div> : !inst.batches.length && !list.length ? (
         <div className="card empty">
           <h2>{t("nobodyJoined")}</h2>
@@ -639,51 +617,76 @@ function Members({ inst, members, setTab, onRemove, onUpdate, focusYear, reload 
             <button className="btn" onClick={() => setTab("link")}>{t("getJoinLink")}</button>
           </div>
         </div>
-      ) : !visible.length || (query.trim() && !matchCount && pinned == null) ? (
-        <div className="card empty"><h2>{t("noMatches")}</h2><p>{t("tryDifferent")}</p></div>
       ) : (
-        <>
-          {!list.length && (
-            <div className="card empty tight year-empty-note">
-              <h2>{t("nobodyJoined")}</h2>
-              <p>{t("shareSoRegister")}</p>
-              <div className="share center">
-                <button className="btn" onClick={() => setTab("link")}>{t("getJoinLink")}</button>
-              </div>
-            </div>
-          )}
-          {visible.map(({ year, group }) => (
-            <section className={`batch-group ${sameYear(pinned, year) ? "focus" : ""}`} id={`batch-${year}`} key={year}>
-              <header className="batch-head">
-                <div>
-                  <p className="eyebrow">{t("yearCompleted")}</p>
-                  <h2>{year}</h2>
-                </div>
-                <span className="year-count ink">{t("alumniCount", { n: group.length })}</span>
-              </header>
-              {group.length ? (
-                <div className="alum-grid">
-                  {group.map((member) => (
-                    <button type="button" className="alum-card" key={member.id} onClick={() => setOpen(member.id)}>
-                      <Avatar name={member.name} photo={member.photo} />
-                      <span className="alum-copy">
-                        <span className="alum-top">
-                          <b>{member.name}</b>
-                          {member.memberNo && <span className="alum-no">{member.memberNo}</span>}
-                        </span>
-                        <small>{[roleLine(member, t), placeLine(member, t)].filter(Boolean).join(" · ")}</small>
-                        {member.mobile && <small className="alum-phone">{member.mobile}</small>}
-                        {member.identityRequest && <span className="pending-badge">{t("updateRequested")}</span>}
-                      </span>
-                    </button>
+        <section className="dir-card">
+          <div className="dir-toolbar">
+            <label className="search-field">
+              <Icon name="search" size={18} />
+              <input placeholder={t("searchPh")} aria-label={t("searchAlumni")} value={query} onChange={(event) => setQuery(event.target.value)} />
+            </label>
+            <label className="dir-select">
+              <span>{t("yearCompleted")}</span>
+              <select value={year} onChange={(event) => { setYear(event.target.value); reload?.(); }}>
+                <option value="">{t("allBatches")} ({list.length})</option>
+                {years.map((value) => (
+                  <option key={value} value={value}>
+                    {value} ({list.filter((member) => sameYear(completedYearOf(member), value)).length})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="dir-select">
+              <span>{t("city")}</span>
+              <select value={city} onChange={(event) => setCity(event.target.value)}>
+                <option value="">{t("all")}</option>
+                {cities.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            {filtered && <button type="button" className="dir-clear" onClick={clearFilters}>✕</button>}
+            <span className="match-line">{t("alumniCount", { n: rows.length })}</span>
+          </div>
+          {rows.length ? (
+            <div className="dir-scroll">
+              <table className="dir-table">
+                <thead>
+                  <tr>
+                    <th>{t("name")}</th>
+                    <th>{t("yearCompleted")}</th>
+                    <th>{t("mobileNumber")}</th>
+                    <th>{t("emailId")}</th>
+                    <th>{t("city")}</th>
+                    <th>{t("designation")}</th>
+                    <th>{t("currentJob")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((member) => (
+                    <tr key={member.id} tabIndex={0} onClick={() => setOpen(member.id)} onKeyDown={(event) => { if (event.key === "Enter") setOpen(member.id); }}>
+                      <td>
+                        <div className="dir-person">
+                          <Avatar name={member.name} photo={member.photo} />
+                          <div>
+                            <b>{member.name}</b>
+                            {member.memberNo && <small className="alum-no">{member.memberNo}</small>}
+                            {member.identityRequest && <span className="pending-badge">{t("updateRequested")}</span>}
+                          </div>
+                        </div>
+                      </td>
+                      <td><span className="yr-pill">{completedYearOf(member) || "–"}</span></td>
+                      <td>{member.mobile || "–"}</td>
+                      <td className="dir-email">{member.email || "–"}</td>
+                      <td>{member.city || "–"}</td>
+                      <td>{member.currentJob?.designation || member.occupation || member.qualification || "–"}</td>
+                      <td>{member.currentJob?.orgName || member.businesses?.[0]?.name || "–"}</td>
+                    </tr>
                   ))}
-                </div>
-              ) : (
-                <p className="year-empty">{query.trim() ? t("noMatches") : t("emptyBatch")}</p>
-              )}
-            </section>
-          ))}
-        </>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty tight"><h2>{filtered ? t("noMatches") : t("nobodyJoined")}</h2><p>{filtered ? t("tryDifferent") : t("shareSoRegister")}</p></div>
+          )}
+        </section>
       )}
       {openMember && (
         <Drawer title={openMember.name} onClose={() => setOpen(null)}>

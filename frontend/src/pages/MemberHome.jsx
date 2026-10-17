@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, uploadPhoto } from "../api";
 import { BI, VISIBILITY_GROUPS } from "../biLabels";
-import { Avatar, Brand, ErrBox, Field } from "../components";
+import { Brand, ErrBox, Field } from "../components";
 import { LangToggle, useI18n } from "../i18n";
+import { MemberEvents } from "../events";
+import { JobBoard } from "../jobs";
+import { Network } from "../network";
 import { ProfileRecord, RegistrationSheet } from "../memberForm";
 import { formFromMember, formIssues, spouseRelevant, visibilityFrom } from "../memberShape";
 import { useAuth, useToast } from "../state";
@@ -45,7 +48,9 @@ export function MemberHome() {
       <div className="join-body stack">
         <nav className="member-nav no-print" aria-label={t("profile")}>
           <button type="button" className={view === "profile" ? "on" : ""} onClick={() => setView("profile")}>{t("profile")}</button>
-          <button type="button" className={view === "friends" ? "on" : ""} onClick={() => setView("friends")}>{t("findFriends")}</button>
+          <button type="button" className={view === "events" ? "on" : ""} onClick={() => setView("events")}>{t("events")}</button>
+          <button type="button" className={view === "friends" ? "on" : ""} onClick={() => setView("friends")}>{t("network")}</button>
+          <button type="button" className={view === "jobs" ? "on" : ""} onClick={() => setView("jobs")}>{t("jobs")}</button>
           <button type="button" className={view === "settings" ? "on" : ""} onClick={() => setView("settings")}>{t("settings")}</button>
         </nav>
 
@@ -80,69 +85,13 @@ export function MemberHome() {
           </section>
         )}
 
-        {view === "friends" && <FindFriends />}
+        {view === "events" && <MemberEvents />}
+        {view === "friends" && <Network />}
+        {view === "jobs" && <JobBoard isAdmin={false} />}
         {view === "settings" && <VisibilitySettings member={member} />}
         <button className="btn ghost no-print" onClick={logout}>{t("signOut")}</button>
       </div>
     </div>
-  );
-}
-
-function FindFriends() {
-  const { t } = useI18n();
-  const { session } = useAuth();
-  const [query, setQuery] = useState("");
-  const [people, setPeople] = useState([]);
-  const [picked, setPicked] = useState(null);
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      const path = query.trim() ? `/api/me/alumni?q=${encodeURIComponent(query.trim())}` : "/api/me/batchmates";
-      api(path)
-        .then((data) => {
-          setPeople(data.alumni || data.batchmates || []);
-          setErr("");
-        })
-        .catch((error) => {
-          setPeople([]);
-          setErr(error.message);
-        });
-    }, 250);
-    return () => clearTimeout(handle);
-  }, [query]);
-
-  return (
-    <section className="card no-print">
-      <h2>{t("findFriends")}</h2>
-      <p className="sub">{t("friendsHint")}</p>
-      <Field label={t("searchFriends")}>
-        <input value={query} placeholder={t("searchFriendsPh")} onChange={(event) => { setQuery(event.target.value); setPicked(null); }} />
-      </Field>
-      <ErrBox msg={err} />
-      {people.length ? (
-        <div className="mate-grid">
-          {people.map((mate) => (
-            <button type="button" className={`mate mate-btn ${picked?.id === mate.id ? "on" : ""}`} key={mate.id} onClick={() => setPicked(mate)}>
-              <Avatar name={mate.name} photo={mate.photo} />
-              <b>{mate.name}</b>
-              <small>{[(mate.yearCompleted || mate.batch) ? t("batchTag", { year: mate.yearCompleted || mate.batch }) : "", mate.city, mate.occupation].filter(Boolean).join(" · ") || t("batchmate")}</small>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="muted">{query.trim() ? t("noFriends") : t("noBatchmates")}</p>
-      )}
-      {picked && (
-        <div className="friend-record">
-          <div className="sec-h">
-            <h2>{picked.name}</h2>
-            <button type="button" className="btn ghost sm" onClick={() => setPicked(null)}>{t("close")}</button>
-          </div>
-          <ProfileRecord member={picked} institutionName={session.institution?.name} />
-        </div>
-      )}
-    </section>
   );
 }
 

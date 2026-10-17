@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "https://pupilsweb.yencodetechnologies.in",
+        target: process.env.VITE_API_TARGET || "http://localhost:7411",
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyRes", (proxyRes) => {

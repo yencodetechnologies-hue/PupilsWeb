@@ -35,9 +35,15 @@ import {
   deleteOtp,
   batchmates,
   alumniSearch,
+  eventsFor,
+  getEvent,
+  insertEvent,
+  updateEvent,
+  deleteEvent,
 } from "./db.js";
 import { applyVisibility, cleanVisibility } from "./visibility.js";
 import { sendOtp } from "./mail.js";
+import { mountNetwork } from "./network.js";
 import {
   BLOOD,
   GENDERS,
@@ -373,6 +379,45 @@ app.post("/api/institution/code", admin, wrap(async (req, res) => {
   res.json({ institution: publicInst(await getInstById(req.inst.id)) });
 }));
 
+function cleanEvent(body) {
+  const title = text(body?.title, 120);
+  const startAt = Number(body?.startAt);
+  const endAt = Number(body?.endAt);
+  if (!title) throw new HttpError(400, "Enter the event title.");
+  if (!Number.isFinite(startAt) || !Number.isFinite(endAt)) throw new HttpError(400, "Choose the start and end date.");
+  if (endAt < startAt) throw new HttpError(400, "The end must be after the start.");
+  return {
+    title,
+    description: text(body?.description, 1500),
+    venue: text(body?.venue, 160),
+    link: text(body?.link, 300),
+    startAt,
+    endAt,
+  };
+}
+
+app.get("/api/events", admin, wrap(async (req, res) => {
+  res.json({ events: await eventsFor(req.inst.id) });
+}));
+
+app.post("/api/events", admin, wrap(async (req, res) => {
+  const row = { id: makeId(), instId: req.inst.id, ...cleanEvent(req.body), createdAt: Date.now() };
+  await insertEvent(row);
+  res.status(201).json({ event: row });
+}));
+
+app.patch("/api/events/:id", admin, wrap(async (req, res) => {
+  const row = await getEvent(req.params.id);
+  if (!row || row.instId !== req.inst.id) throw new HttpError(404, "That event was not found.");
+  await updateEvent(row.id, cleanEvent(req.body));
+  res.json({ event: await getEvent(row.id) });
+}));
+
+app.delete("/api/events/:id", admin, wrap(async (req, res) => {
+  if (!await deleteEvent(req.params.id, req.inst.id)) throw new HttpError(404, "That event was not found.");
+  res.json({ ok: true });
+}));
+
 app.get("/api/members", admin, wrap(async (req, res) => {
   res.json({ members: await membersFor(req.inst.id) });
 }));
@@ -606,6 +651,8 @@ app.post("/api/join/:code", wrap(async (req, res) => {
 
 const memberOnly = requireUser("member");
 
+mountNetwork(app, { admin, memberOnly });
+
 app.get("/api/me/batchmates", memberOnly, wrap(async (req, res) => {
   const rows = await batchmates(req.member.instId, req.member, req.member.id);
   res.json({ batchmates: rows.map((row) => applyVisibility(publicMember(row), req.member)) });
@@ -614,6 +661,10 @@ app.get("/api/me/batchmates", memberOnly, wrap(async (req, res) => {
 app.get("/api/me/alumni", memberOnly, wrap(async (req, res) => {
   const rows = await alumniSearch(req.member.instId, req.member.id, text(req.query.q, 80));
   res.json({ alumni: rows.map((row) => applyVisibility(publicMember(row), req.member)) });
+}));
+
+app.get("/api/me/events", memberOnly, wrap(async (req, res) => {
+  res.json({ events: await eventsFor(req.member.instId) });
 }));
 
 app.patch("/api/me/visibility", memberOnly, wrap(async (req, res) => {
