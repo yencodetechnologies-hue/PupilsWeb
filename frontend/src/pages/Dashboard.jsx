@@ -4,6 +4,7 @@ import { api, downloadCsv } from "../api";
 import { joinUrl } from "../site";
 import { Avatar, Brand, Drawer, ErrBox, Field, Icon, MemberProfile, PasswordField } from "../components";
 import { AdminEvents } from "../events";
+import { AdminBanners } from "../banners";
 import { JobBoard } from "../jobs";
 import { Bell, Feed } from "../social";
 import { LangToggle, typeLabel, useI18n } from "../i18n";
@@ -184,6 +185,19 @@ function AccountProfile({ inst, onChange }) {
           <p>{t("profileHint")}</p>
         </div>
       </header>
+      <section className="profile-hero">
+        <div className="ph-avatar">{(inst.name || "?").trim()[0]?.toUpperCase()}</div>
+        <div className="ph-main">
+          <h2>{inst.name}</h2>
+          <p>{typeLabel(t, inst.type)} · {inst.admin.name}</p>
+          <p className="ph-contact">{inst.admin.email} · {inst.admin.mobile}</p>
+        </div>
+        <div className="ph-stats">
+          <span><b>{inst.batches.length}</b>{t("batches")}</span>
+          <span><b>{inst.code}</b>{t("joinLink")}</span>
+        </div>
+      </section>
+      <AdminBanners />
       <form className="stack profile-form" onSubmit={save} noValidate>
         <section className="card">
           <h2>{t("yourDetails")}</h2>

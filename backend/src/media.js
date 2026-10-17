@@ -84,3 +84,26 @@ export function acceptPhoto(photo, photoId) {
   }
   return { photo: url.toString(), photoId: id };
 }
+
+export function uploadBanner(buffer) {
+  const api = client();
+  const publicId = `pupilsweb/banners/${crypto.randomUUID()}`;
+  return new Promise((resolve, reject) => {
+    const stream = api.uploader.upload_stream(
+      {
+        public_id: publicId,
+        resource_type: "image",
+        overwrite: false,
+        transformation: [{ width: 1600, height: 1600, crop: "limit" }],
+      },
+      (error, result) => {
+        if (error || !result?.secure_url) {
+          reject(new HttpError(502, "Could not store the banner. Try again."));
+          return;
+        }
+        resolve({ image: result.secure_url, imageId: result.public_id });
+      }
+    );
+    Readable.from(buffer).pipe(stream);
+  });
+}

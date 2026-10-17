@@ -6,6 +6,7 @@ import { Brand, ErrBox, Field } from "../components";
 import { LangToggle, useI18n } from "../i18n";
 import { MemberEvents } from "../events";
 import { JobBoard } from "../jobs";
+import { BannerCarousel } from "../banners";
 import { Network } from "../network";
 import { Bell, Feed, Messages } from "../social";
 import { ProfileRecord, RegistrationSheet } from "../memberForm";
@@ -47,6 +48,7 @@ export function MemberHome() {
         <p>{t("batchTag", { year: member.yearCompleted || member.batch })}</p>
       </header>
       <div className="join-body stack">
+        <BannerCarousel />
         <nav className="member-nav no-print" aria-label={t("profile")}>
           <button type="button" className={view === "feed" ? "on" : ""} onClick={() => setView("feed")}>{t("feed")}</button>
           <button type="button" className={view === "profile" ? "on" : ""} onClick={() => setView("profile")}>{t("profile")}</button>

@@ -45,6 +45,7 @@ import { applyVisibility, cleanVisibility } from "./visibility.js";
 import { sendOtp } from "./mail.js";
 import { mountNetwork } from "./network.js";
 import { mountSocial } from "./social.js";
+import { mountBanners } from "./banners.js";
 import { notifyAllMembers } from "./notify.js";
 import {
   BLOOD,
@@ -656,6 +657,7 @@ const memberOnly = requireUser("member");
 
 mountNetwork(app, { admin, memberOnly });
 mountSocial(app, { admin, memberOnly });
+mountBanners(app, { admin, memberOnly });
 
 app.get("/api/me/batchmates", memberOnly, wrap(async (req, res) => {
   const rows = await batchmates(req.member.instId, req.member, req.member.id);
