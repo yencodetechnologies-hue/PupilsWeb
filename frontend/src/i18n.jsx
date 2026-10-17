@@ -492,6 +492,7 @@ const en = {
   noLink: "No link",
   bannerOn: "On",
   bannerOff: "Off",
+  admin: "Admin",
 };
 
 const ta = {
@@ -984,6 +985,7 @@ const ta = {
   noLink: "இணைப்பு இல்லை",
   bannerOn: "இயக்கம்",
   bannerOff: "அணைவு",
+  admin: "நிர்வாகி",
 };
 
 const DICT = { en, ta };

@@ -57,18 +57,29 @@ export function Dashboard() {
       <aside className="side">
         <div className="side-top">
           <Brand />
-          <Bell isAdmin onOpen={go} />
-          <LangToggle />
         </div>
         <div className="inst">
-          <b>{inst.name}</b>
-          <small>{typeLabel(t, inst.type)} · {inst.admin.name}</small>
+          <span className="inst-av">{(inst.name || "?").trim()[0]?.toUpperCase()}</span>
+          <span className="inst-txt">
+            <b>{inst.name}</b>
+            <small>{typeLabel(t, inst.type)} · {inst.admin.name}</small>
+          </span>
         </div>
-        {nav}
-        <div className="spacer" />
-        <SignOut />
+        <p className="side-label">{t("sections")}</p>
+        <div className="side-nav">{nav}</div>
       </aside>
       <div className="shell">
+        <header className="topbar">
+          <div className="tb-title">
+            <small>{typeLabel(t, inst.type)}</small>
+            <b>{t(TABS.find(([key]) => key === tab)?.[1] || "overview")}</b>
+          </div>
+          <div className="tb-tools">
+            <Bell isAdmin onOpen={go} />
+            <LangToggle tone="light" />
+            <ProfileMenu inst={inst} go={go} />
+          </div>
+        </header>
         <header className="mobile-bar">
           <div className="brand-mark">P</div>
           <div className="mb-title">
@@ -233,6 +244,50 @@ function AccountProfile({ inst, onChange }) {
         </section>
       </form>
     </>
+  );
+}
+
+function ProfileMenu({ inst, go }) {
+  const { t } = useI18n();
+  const { setSession } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const initial = (inst.admin.name || inst.name || "?").trim()[0]?.toUpperCase();
+  const logout = async () => {
+    await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setSession(null);
+    navigate("/");
+  };
+  const pick = (action) => { setOpen(false); action(); };
+
+  return (
+    <div className="pm-wrap">
+      <button type="button" className={`pm-btn ${open ? "open" : ""}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="pm-av">{initial}</span>
+        <span className="pm-txt"><b>{inst.admin.name}</b><small>{t("admin")}</small></span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <>
+          <button type="button" className="bell-scrim" aria-label={t("close")} onClick={() => setOpen(false)} />
+          <div className="pm-panel" role="menu">
+            <div className="pm-head">
+              <span className="pm-av lg">{initial}</span>
+              <div>
+                <b>{inst.admin.name}</b>
+                <small>{inst.admin.email}</small>
+                <small>{inst.name}</small>
+              </div>
+            </div>
+            <button type="button" role="menuitem" onClick={() => pick(() => go("profile"))}><Icon name="profile" size={18} />{t("profile")}</button>
+            <button type="button" role="menuitem" onClick={() => pick(() => go("link"))}><Icon name="link" size={18} />{t("joinLink")}</button>
+            <button type="button" role="menuitem" onClick={() => pick(() => go("members"))}><Icon name="members" size={18} />{t("alumni")}</button>
+            <hr />
+            <button type="button" role="menuitem" className="danger" onClick={() => pick(logout)}><Icon name="logout" size={18} />{t("signOut")}</button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
