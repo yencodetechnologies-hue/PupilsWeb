@@ -1,4 +1,5 @@
-import { col, getMemberById, publicMember } from "./db.js";
+import { col, getInstById, getMemberById, publicMember } from "./db.js";
+import { notifyAdmin, notifyAllMembers, notifyMember } from "./notify.js";
 import { applyVisibility } from "./visibility.js";
 import { HttpError, makeId, text, wrap } from "./util.js";
 
@@ -114,10 +115,12 @@ export function mountNetwork(app, { admin, memberOnly }) {
     if (existing) {
       if (existing.status === "pending" && existing.to === me.id) {
         await links().updateOne({ id: existing.id }, { $set: { status: "accepted", acceptedAt: Date.now() } });
+        notifyMember(other, { type: "connected", text: `${me.name} accepted your connection`, view: "friends" });
       }
       return res.json({ ok: true });
     }
     await links().insertOne({ id: makeId(), instId: me.instId, from: me.id, to: other.id, status: "pending", createdAt: Date.now() });
+    notifyMember(other, { type: "request", text: `${me.name} wants to connect with you`, view: "friends" });
     res.status(201).json({ ok: true });
   }));
 
@@ -125,6 +128,7 @@ export function mountNetwork(app, { admin, memberOnly }) {
     const item = await links().findOne({ id: req.params.id, to: req.member.id, status: "pending" });
     if (!item) throw new HttpError(404, "That request was not found.");
     await links().updateOne({ id: item.id }, { $set: { status: "accepted", acceptedAt: Date.now() } });
+    notifyMember(await getMemberById(item.from), { type: "connected", text: `${req.member.name} accepted your connection`, view: "friends" });
     res.json({ ok: true });
   }));
 
@@ -153,6 +157,7 @@ export function mountNetwork(app, { admin, memberOnly }) {
       postedBy: { kind: "admin", id: req.inst.id, name: req.inst.name },
     };
     await col("jobs").insertOne(job);
+    notifyAllMembers(job.instId, null, { type: "job", text: `New job: ${job.title} at ${job.company}`, view: "jobs" });
     res.status(201).json({ ok: true });
   }));
 
@@ -184,6 +189,7 @@ export function mountNetwork(app, { admin, memberOnly }) {
       postedBy: { kind: "member", id: req.member.id, name: req.member.name },
     };
     await col("jobs").insertOne(job);
+    notifyAllMembers(job.instId, req.member.id, { type: "job", text: `New job: ${job.title} at ${job.company}`, view: "jobs" });
     res.status(201).json({ ok: true });
   }));
 
@@ -222,6 +228,9 @@ export function mountNetwork(app, { admin, memberOnly }) {
       id: makeId(), jobId: job.id, instId: job.instId, memberId: req.member.id,
       note: text(req.body?.note, 600), createdAt: Date.now(),
     });
+    const message = { type: "application", text: `${req.member.name} applied for ${job.title}`, view: "jobs" };
+    if (job.postedBy?.kind === "admin") notifyAdmin(await getInstById(job.instId), message);
+    else notifyMember(await getMemberById(job.postedBy?.id), message);
     res.status(201).json({ ok: true });
   }));
 }

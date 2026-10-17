@@ -5,6 +5,7 @@ import { joinUrl } from "../site";
 import { Avatar, Brand, Drawer, ErrBox, Field, Icon, MemberProfile, PasswordField } from "../components";
 import { AdminEvents } from "../events";
 import { JobBoard } from "../jobs";
+import { Bell, Feed } from "../social";
 import { LangToggle, typeLabel, useI18n } from "../i18n";
 import { useAuth, useToast } from "../state";
 
@@ -12,6 +13,7 @@ const TABS = [
   ["overview", "overview"],
   ["batches", "batches"],
   ["link", "joinLink"],
+  ["feed", "feed"],
   ["events", "events"],
   ["jobs", "jobs"],
   ["members", "alumni"],
@@ -54,6 +56,7 @@ export function Dashboard() {
       <aside className="side">
         <div className="side-top">
           <Brand />
+          <Bell isAdmin onOpen={go} />
           <LangToggle />
         </div>
         <div className="inst">
@@ -71,6 +74,7 @@ export function Dashboard() {
             <b>{inst.name}</b>
             <small>{typeLabel(t, inst.type)} · {inst.admin.name}</small>
           </div>
+          <Bell isAdmin onOpen={go} />
           <LangToggle />
           <SignOut compact />
         </header>
@@ -90,6 +94,7 @@ export function Dashboard() {
               onUpdate={(member) => setMembers((list) => list.map((item) => (item.id === member.id ? member : item)))}
             />
           )}
+          {tab === "feed" && <Feed isAdmin />}
           {tab === "events" && <AdminEvents />}
           {tab === "jobs" && <JobBoard isAdmin />}
           {tab === "profile" && <AccountProfile inst={inst} onChange={applyInst} />}

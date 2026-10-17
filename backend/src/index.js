@@ -44,6 +44,8 @@ import {
 import { applyVisibility, cleanVisibility } from "./visibility.js";
 import { sendOtp } from "./mail.js";
 import { mountNetwork } from "./network.js";
+import { mountSocial } from "./social.js";
+import { notifyAllMembers } from "./notify.js";
 import {
   BLOOD,
   GENDERS,
@@ -403,6 +405,7 @@ app.get("/api/events", admin, wrap(async (req, res) => {
 app.post("/api/events", admin, wrap(async (req, res) => {
   const row = { id: makeId(), instId: req.inst.id, ...cleanEvent(req.body), createdAt: Date.now() };
   await insertEvent(row);
+  notifyAllMembers(req.inst.id, null, { type: "event", text: `New event: ${row.title}`, view: "events" });
   res.status(201).json({ event: row });
 }));
 
@@ -652,6 +655,7 @@ app.post("/api/join/:code", wrap(async (req, res) => {
 const memberOnly = requireUser("member");
 
 mountNetwork(app, { admin, memberOnly });
+mountSocial(app, { admin, memberOnly });
 
 app.get("/api/me/batchmates", memberOnly, wrap(async (req, res) => {
   const rows = await batchmates(req.member.instId, req.member, req.member.id);

@@ -7,6 +7,7 @@ import { LangToggle, useI18n } from "../i18n";
 import { MemberEvents } from "../events";
 import { JobBoard } from "../jobs";
 import { Network } from "../network";
+import { Bell, Feed, Messages } from "../social";
 import { ProfileRecord, RegistrationSheet } from "../memberForm";
 import { formFromMember, formIssues, spouseRelevant, visibilityFrom } from "../memberShape";
 import { useAuth, useToast } from "../state";
@@ -19,7 +20,7 @@ export function MemberHome() {
   const member = session.member;
   const inst = session.institution;
   const unfinished = needsProfile(member);
-  const [view, setView] = useState("profile");
+  const [view, setView] = useState(() => (needsProfile(member) ? "profile" : "feed"));
   const [editing, setEditing] = useState(false);
   const showForm = view === "profile" && (unfinished || editing);
 
@@ -39,7 +40,7 @@ export function MemberHome() {
   return (
     <div className="join-wrap member-home">
       <header className="join-hero no-print">
-        <LangToggle />
+        <div className="hero-tools"><Bell onOpen={(next) => setView(next)} /><LangToggle /></div>
         <Brand />
         <p className="eyebrow light">{member.name}</p>
         <h1>{inst?.name || t("yourInstitution")}</h1>
@@ -47,9 +48,11 @@ export function MemberHome() {
       </header>
       <div className="join-body stack">
         <nav className="member-nav no-print" aria-label={t("profile")}>
+          <button type="button" className={view === "feed" ? "on" : ""} onClick={() => setView("feed")}>{t("feed")}</button>
           <button type="button" className={view === "profile" ? "on" : ""} onClick={() => setView("profile")}>{t("profile")}</button>
           <button type="button" className={view === "events" ? "on" : ""} onClick={() => setView("events")}>{t("events")}</button>
           <button type="button" className={view === "friends" ? "on" : ""} onClick={() => setView("friends")}>{t("network")}</button>
+          <button type="button" className={view === "messages" ? "on" : ""} onClick={() => setView("messages")}>{t("messages")}</button>
           <button type="button" className={view === "jobs" ? "on" : ""} onClick={() => setView("jobs")}>{t("jobs")}</button>
           <button type="button" className={view === "settings" ? "on" : ""} onClick={() => setView("settings")}>{t("settings")}</button>
         </nav>
@@ -85,6 +88,8 @@ export function MemberHome() {
           </section>
         )}
 
+        {view === "feed" && <Feed isAdmin={false} />}
+        {view === "messages" && <Messages />}
         {view === "events" && <MemberEvents />}
         {view === "friends" && <Network />}
         {view === "jobs" && <JobBoard isAdmin={false} />}
